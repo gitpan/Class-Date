@@ -1,7 +1,17 @@
 package Class::Date;
-use Time::Local qw(timegm timelocal);
+use Time::Local;
+BEGIN {
+    if (exists $Time::Local::{timelocal_nocheck}) {
+        *timelocal = *Time::Local::timelocal_nocheck;
+        *timegm = *Time::Local::timegm_nocheck;
+    } else {
+        *timelocal = *Time::Local::timelocal;
+        *timegm = *Time::Local::timegm;
+        
+    }
+}
 
-# $Id: Date.pm,v 1.20 2001/07/12 13:35:05 dlux Exp $
+# $Id: Date.pm,v 1.2 2001/10/11 10:45:18 dlux Exp $
 
 require 5.005;
 
@@ -43,7 +53,7 @@ BEGIN {
 
 }
 
-$VERSION = '1.0.5';
+$VERSION = '1.0.6';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -228,6 +238,7 @@ sub _recalc_from_struct {
     $s->[c_yday]  = 0;
     $s->[c_epoch] = 0; # these are required to suppress warinngs;
     eval {
+        local $SIG{__WARN__} = sub { };
         $s->[c_epoch] = $s->[c_isgmt] ?
             timegm(@{$s}[c_sec,c_min,c_hour,c_day,c_mon,c_year]) :
             timelocal(@{$s}[c_sec,c_min,c_hour,c_day,c_mon,c_year]);
@@ -395,10 +406,7 @@ sub month_begin { my ($s)=@_;
 }
 
 sub month_end { my ($s)=@_;
-  my $aref = $s->aref;
-  $aref->[2] = 1;
-  $aref->[1]++; # It will be normalized
-  return $s->new($aref)-'1D';
+  return $s->clone(day => 1)+'1M'-'1D';
 }
 
 sub days_in_month {
@@ -1263,6 +1271,7 @@ Portions Copiright (c) Matt Sergeant
     (Lots of code are borrowed from the Time::Object module)
   - Tatsuhiko Miyagawa <miyagawa@cpan.org> (bugfixes)
   - Stas Bekman <stas@stason.org> (suggestions, bugfix)
+  - Chris Winters <chris@cwinters.com> (win32 .ppd version)
 
 =head1 SEE ALSO
 
