@@ -1,5 +1,21 @@
 Revision history for Perl extension Class::Date.
 
+0.98   	Tue May 22 16:46:03 CEST 2001
+	- bug in "truncate" method fixed
+	- documentation changes
+
+0.97	Wed May 16 23:10:17 CEST 2001
+	- Accepts the date in "YYYY-MM-DD HH:MM" format
+	- uses Time::Local instead of strftime("%s"), because the latter
+	  is not available in not GNU environment
+
+0.96	Fri May 11 01:42:36 CEST 2001
+	- Fixed $DST_ADJUST bug when adding months
+	- Added $MONTH_BORDER_ADJUST variable and documentation for it
+	- Added "month_begin", "month_end" and "days_in_month" method
+	- Fixed the "aref" method
+	- Doc. grammar fixes
+
 0.95    Thu May 10 00:11:43 CEST 2001
 	- Fixed comparison problem with undef
 	- date("2001-01-31")+'1M'-'1M' != "2001-01-31" "bug" documented

@@ -1,4 +1,4 @@
-print "1..5\n";
+print "1..6\n";
 
 use Class::Date qw(now gmdate);
 print "ok 1\n";
@@ -16,3 +16,6 @@ print "ok 4\n";
 
 print "not " unless now>"1970-1-1";
 print "ok 5\n";
+
+print "not " unless gmdate("now")>"1970-1-1";
+print "ok 6\n";

@@ -1,7 +1,7 @@
 use Test;
 use strict;
 BEGIN { 
-  plan tests => 62;
+  plan tests => 74;
 };
 use Class::Date qw(localdate date);
 
@@ -31,8 +31,8 @@ ok $date4,"2001-03-11 00:00:00";
 my $date5=localdate("2001-2-21 13:11:10.123456");
 ok $date5,"2001-02-21 13:11:10";
 
-my $date6=localdate("2001-2-21 13:11:06");
-ok $date6,"2001-02-21 13:11:06";
+my $date6=localdate("2001-2-21 13:11");
+ok $date6,"2001-02-21 13:11";
 
 my $date7=localdate("2000-11-11 0:0:0");
 ok $date7,"2000-11-11";
@@ -52,7 +52,7 @@ my $reldate1=Class::Date::Rel->new('1D');
 ok $reldate1,"0000-00-01 00:00:00";
 
 my $reldate2=Class::Date::Rel->new('1Y 1M 15h 20m');
-ok $reldate2,"0001-01-00 15:20:00";
+ok $reldate2,"0001-01-00 15:20";
 
 my $reldate3=Class::Date::Rel->new('3Y 3M 5D 13h 20m 15s');
 ok $reldate3,"0003-03-05 13:20:15";
@@ -149,3 +149,22 @@ ok undef() > $date11 ? 0 : 1;
 ok $date13 < undef() ? 0 : 1;
 ok undef() < $date13 ? 1 : 0;
 
+ok $date1->month_begin,"2000-11-01 00:01:02";
+ok $date1->month_end  ,"2000-11-30 00:01:02";
+ok $date1->days_in_month,30;
+ok $date2->days_in_month,31;
+ok $date5->days_in_month,28;
+
+ok $date1->truncate,"2000-11-11 00:00:00";
+ok $date1->trunc,"2000-11-11 00:00:00";
+ok $date1,"2000-11-11 00:01:02";
+
+{
+  local $Class::Date::MONTH_BORDER_ADJUST = 0;
+  my $date11 = date("2001-05-31");
+  ok $date11+'4M',"2001-10-01";
+  ok $date11-'3M',"2001-03-03";
+  $Class::Date::MONTH_BORDER_ADJUST = 1;
+  ok $date11+'4M',"2001-09-30";
+  ok $date11-'3M',"2001-02-28";
+}

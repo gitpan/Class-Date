@@ -1,12 +1,14 @@
 package Class::Date;
+use Time::Local qw(timegm_nocheck timelocal_nocheck);
 
-# $Id: Date.pm,v 1.8 2001/04/28 14:41:30 dlux Exp $
+# $Id: Date.pm,v 1.13 2001/05/22 14:44:40 dlux Exp $
 
 require 5.005;
 
 use strict;
 use vars qw(
-  $VERSION @EXPORT_OK $DATE_FORMAT $DST_ADJUST @NEW_FROM_SCALAR @ISA
+  $VERSION @EXPORT_OK $DATE_FORMAT $DST_ADJUST $MONTH_BORDER_ADJUST
+  @NEW_FROM_SCALAR @ISA
 );
 use Carp;
 use UNIVERSAL qw(isa);
@@ -19,10 +21,11 @@ BEGIN {
   @EXPORT_OK = qw( date localdate gmdate cs_mon cs_sec now ) 
 }
 
-$VERSION = '0.95';
+$VERSION = '0.98';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
+$MONTH_BORDER_ADJUST = 0;
 $DATE_FORMAT="%Y-%m-%d %H:%M:%S";
 
 # constants for Class::Date fields
@@ -145,8 +148,15 @@ sub new_from_scalar { my ($s,$time,$isgmt)=@_;
 
 sub new_from_scalar_internal { my ($s,$time,$isgmt) = @_;
   return undef if !$time;
-        
-  if ($time =~ /^\s*(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)\d*\s*$/) { 
+
+  if ($time eq 'now') {
+    # now string
+    my $obj=bless [],'Class::Date';
+    $obj->[c_epoch]=time;
+    $obj->[c_isgmt]=$isgmt;
+    $obj->_recalc_from_epoch;
+    return $obj;
+  } elsif ($time =~ /^\s*(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)\d*\s*$/) { 
     # mysql timestamp
     my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$4,$5,$6);
     return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss],$isgmt);
@@ -158,8 +168,8 @@ sub new_from_scalar_internal { my ($s,$time,$isgmt) = @_;
     $obj->_recalc_from_epoch;
     return $obj;
   } elsif ($time =~ m{ ^\s* ( \d{0,4} ) - ( \d\d? ) - ( \d\d? ) 
-     ( \s+ ( \d\d? ) : ( \d\d? ) : ( \d\d? ) (\.\d+)? )? }x) {
-    my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$5,$6,$7);
+     ( \s+ ( \d\d? ) : ( \d\d? ) ( : ( \d\d?  ) (\.\d+)?)? )? }x) {
+    my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$5,$6,$8);
     # ISO date
     return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss],$isgmt);
   }
@@ -182,8 +192,9 @@ sub _recalc_from_struct { my ($s) = @_;
   $s->[c_wday]  = 0;
   $s->[c_yday]  = 0;
   $s->[c_epoch] = 0; # these are required to suppress warinngs;
-  $s->[c_epoch] = $s->strftime('%s');
-  $s->[c_epoch]+= $s->tzoffset if $s->[c_isgmt];
+  $s->[c_epoch] = $s->[c_isgmt] ?
+    timegm_nocheck(@{$s}[c_sec,c_min,c_hour,c_day,c_mon,c_year]) :
+    timelocal_nocheck(@{$s}[c_sec,c_min,c_hour,c_day,c_mon,c_year]);
   $s->_recalc_from_epoch;
 }
 
@@ -240,7 +251,7 @@ sub array { my ($s)=@_;
   @return;
 }
 
-sub aref { return \( shift() -> array() ) }
+sub aref { return [ shift() -> array() ] }
 *as_array = *aref;
 
 sub struct {
@@ -281,6 +292,23 @@ sub tzoffset { my ($s)=@_;
   return int($delta * 60 + ($delta >= 0 ? 0.5 : -0.5)) * 60;
 }
 
+sub month_begin { my ($s)=@_;
+  my $aref = $s->aref;
+  $aref->[2] = 1;
+  return $s->new($aref);
+}
+
+sub month_end { my ($s)=@_;
+  my $aref = $s->aref;
+  $aref->[2] = 1;
+  $aref->[1]++; # It will be normalized
+  return $s->new($aref)-'1D';
+}
+
+sub days_in_month {
+  shift->month_end->mday;
+}
+
 sub strftime { my ($s,$format)=@_;
   $format ||= "%a, %d %b %Y %H:%M:%S %Z";
   return strftime_xs($format,$s->struct);
@@ -314,6 +342,12 @@ sub add { my ($s,$rhs)=@_;
     $s->new_from_scalar($s->[c_epoch]+$rhs->[cs_sec],$s->[c_isgmt]) :
     $s->new_copy($s);
 
+  # adjust DST if necessary
+  if ( $DST_ADJUST && (my $dstdiff=$retval->[c_isdst]-$s->[c_isdst]))  {
+    $retval->[c_epoch] -= $dstdiff*60*60;
+    $retval->_recalc_from_epoch;
+  }
+  
   # adding months
   if ($rhs->[cs_mon]) {
     $retval->[c_mon]+=$rhs->[cs_mon];
@@ -321,14 +355,15 @@ sub add { my ($s,$rhs)=@_;
       int ($retval->[c_mon]/12) :
       int (($retval->[c_mon]-11)/12);
     $retval->[c_mon]  -= 12*$year_diff;
+    my $expected_month = $retval->[c_mon];
     $retval->[c_year] += $year_diff;
     $retval->_recalc_from_struct;
-  }
-  
-  # adjust DST if necessary
-  if ( $DST_ADJUST && (my $dstdiff=$retval->[c_isdst]-$s->[c_isdst]))  {
-    $retval->[c_epoch] -= $dstdiff*60*60;
-    $retval->_recalc_from_epoch;
+
+    # adjust month border if necessary
+    if ($MONTH_BORDER_ADJUST && $expected_month != $retval->[c_mon]) {
+      $retval->[c_epoch] -= $retval->[c_day]*60*60*24;
+      $retval->_recalc_from_epoch;
+    }
   }
   
   # sigh! We finished!
@@ -336,12 +371,7 @@ sub add { my ($s,$rhs)=@_;
 }
 
 sub trunc { my ($s)=@_;
-  $s->new_from_array([@{$s}[c_year,c_mon,c_day],0,0,0],$s->[c_isgmt]);
-  $s->[c_sec]=0;
-  $s->[c_min]=0;
-  $s->[c_hour]=0;
-  $s->_recalc_from_struct;
-  $s;
+  return $s->new_from_array([$s->year,$s->month,$s->day,0,0,0],$s->[c_isgmt]);
 }
 
 *truncate = *trunc;
@@ -426,9 +456,9 @@ sub new_from_scalar_internal { my ($s,$val)=@_;
     if $val =~ / ^ \s* ( \-? \d+ ( \. \d* )? ) \s* $/x;
 
   if ($val =~ m{ ^\s* ( \d{1,4} ) - ( \d\d? ) - ( \d\d? ) 
-      ( \s+ ( \d\d? ) : ( \d\d? ) : ( \d\d? ) (\.\d+)? )? }x ) {
+      ( \s+ ( \d\d? ) : ( \d\d? ) ( : ( \d\d? )? (\.\d+)? )?  )? }x ) {
     # ISO date
-    my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$5,$6,$7);
+    my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$5,$6,$8);
     return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss]);
   }
 
@@ -565,7 +595,7 @@ Class::Date - Class for easy date and time manipulation
   $date->monname;     # name of month, eg: March
   $date->monthname;   # same as prev.
   $date->wdayname;    # Thursday
-  $date->day_of_weekname; # same as prev.
+  $date->day_of_weekname # same as prev.
   $date->hms          # 01:23:45
   $date->ymd          # 2000/02/29
   $date->mdy          # 02/29/2000
@@ -586,6 +616,10 @@ Class::Date - Class for easy date and time manipulation
   
   %hash=$date->hash;
 
+  $date->month_begin  # First day of the month (date object)
+  $date->month_end    # Last day of the month
+  $date->days_in_month # 28..31
+
   # date format changes
   {
     local $Class::Date::DATE_FORMAT="%Y%m%d%H%M%S";
@@ -599,6 +633,12 @@ Class::Date - Class for easy date and time manipulation
   # adjusting DST in calculations  (see the doc)
   $Class::Date::DST_ADJUST = 1; # this is the default
   $Class::Date::DST_ADJUST = 0;
+
+  # "month-border adjust" flag 
+  $Class::Date::MONTH_BORDER_ADJUST = 0; # this is the default
+  print date("2001-01-31")+'1M'; # will print 2001-03-03
+  $Class::Date::MONTH_BORDER_ADJUST = 1;
+  print date("2001-01-31")+'1M'; # will print 2001-02-28
 
   # getting values of a relative date object
   $reldate;              # reldate in seconds (assumed 1 month = 2_629_744 secs)
@@ -618,14 +658,14 @@ Class::Date - Class for easy date and time manipulation
   print date([2001,12,11,4,5,6])->truncate; 
                                # will print "2001-12-11"
   $new_date = $date+$reldate;
-  $date2    = $date+'3Y';      # 3 Year
-  $date3    = $date+[1,2,3];   # $date plus 1 year, 2 month, 3 days
-  $date4    = $date+'3-1-5'    # $date plus 3 year, 1 month, 5 days
+  $date2    = $date+'3Y 2D';   # 3 Years and 2 days
+  $date3    = $date+[1,2,3];   # $date plus 1 year, 2 months, 3 days
+  $date4    = $date+'3-1-5'    # $date plus 3 years, 1 months, 5 days
 
   $new_date = $date-$reldate;
-  $date2    = $date-'3Y';      # 3 Year
-  $date3    = $date-[1,2,3];   # $date minus 1 year, 2 month, 3 days
-  $date4    = $date-'3-1-5'    # $date minus 3 year, 1 month, 5 days
+  $date2    = $date-'3Y';      # 3 Yearss
+  $date3    = $date-[1,2,3];   # $date minus 1 year, 2 months, 3 days
+  $date4    = $date-'3-1-5'    # $date minus 3 years, 1 month, 5 days
 
   $new_reldate = $date1-$date2;
   $reldate2 = Class::Date->new('2000-11-12')-'2000-11-10';
@@ -702,7 +742,8 @@ A valid 32-bit integer: This is parsed as a unix time.
 
 =item "YYYY-MM-DD hh::mm:ss"
 
-A standard ISO date format. Additional ".fraction" part is ignored.
+A standard ISO date format. Additional ".fraction" part is ignored, ":ss" 
+can be omitted.
 
 =item additional input formats
 
@@ -712,7 +753,7 @@ You can specify "-DateParse" as  an import parameter, e.g:
 
 With this, the module will try to load Date::Parse module, and if it find it then all 
 these formats can be used as an input. Please refer to the Date::Parse
-documentation (this part is not tested).
+documentation (this part is not tested by the author but is reported to work).
 
 =back
 
@@ -866,6 +907,21 @@ dates, e.g when you add one month to 2001-01-31, you expect to get
 This problem can occur only with months and years, because others can 
 easily be converted to seconds.
 
+=head1 MONTH_BORDER_ADJUST
+
+$MONTH_BORDER_ADJUST variable is used to switch on or off the 
+month-adjust feature. This is used only when someone adds months or years to
+a date and then the resulted date became invalid. An example: adding one
+month to "2001-01-31" will result "2001-02-31", and this is an invalid date.
+
+When $MONTH_BORDER_ADJUST is false, this result simply normalized, and
+becomes "2001-03-03". This is the default behaviour.
+
+When $MONTH_BORDER_ADJUST is true, this result becomes "2001-02-28". So when
+the date overflows, then it returns the last day insted.
+
+Both settings keeps the time information.
+
 =head1 INTERNALS
 
 This module uses operator overloading very heavily. I've found it quite stable,
@@ -895,24 +951,47 @@ As of 0.90 this code is in alpha status, and
 I want to release the beta versions (0.91-) soon, and then I want to release the
 version 1.0 if no bugs can be found in that period.
 
+=head1 DEVELOPMENT FOCUS
+
+The first goal when I have developed this module is to make this module very 
+easy to use.
+
+The second most important goal was to make it full-featured.
+
+The third most important goal was to make it work everywhere. The only issue
+with this was the 'strftime("%s")' problem, I hope it has been solved.
+
+The fourth most important goal was to make it use as low memory as possible.
+It is an issue if someone runs this module under mod_perl.
+
+I hope all these goals can be reached by the 1.0 release.
+
+Speed was not an issue until 1.0, because people usually do not need to do
+tons of date manipulations in a short time. 
+
+=head1 SPEED ISSUES
+
+There are two kind of adjustment in this module, DST_ADJUST and
+MONTH_BORDER_ADJUST. Both of them makes the "+" and "-" operations slower. If
+you don't need them, switch them off to achieve faster calculations.
+
+In general, if you really need fast date and datetime calculation, don't use 
+this module. As you see in the previous section, the focus of development is 
+not the speed until 1.0.  For fast date and datetime calculations, use 
+Date::Calc instead.
+
 =head1 BUGS
 
 =over 4
 
 =item *
 
-This module uses the POSIX functions for date and time calculations, so
+This module uses the POSIX functions (but not the POSIX module)
+for date and time calculations, so
 it is not working for dates beyond 2038 and before 1902. I hope that someone 
 will fix this with new time_t in libc. If you really need dates over 2038, 
 you need to completely rewrite this module or use Date::Calc or other date 
 modules.
-
-=item *
-
-This version of the module is known not to work in Win32 and Solaris (and
-possibly other platforms), because strftime on these platform does not 
-have a "%s" macro. However this module is reported (by the CPAN::Testers) to
-work on FreeBSD and Linux.
 
 =back
 
@@ -933,7 +1012,7 @@ Portions Copiright (c) Matt Sergeant
 
   - Matt Sergeant <matt@sergeant.org>
     (Lots of code are borrowed from the Time::Object module)
-  - Tatsuhiko Miyagawa <miyagawa@edge.co.jp> (bugfixes)
+  - Tatsuhiko Miyagawa <miyagawa@cpan.org> (bugfixes)
 
 =head1 SEE ALSO
 

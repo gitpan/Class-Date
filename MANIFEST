@@ -2,8 +2,9 @@ Changes
 Date.pm
 Date.xs
 MANIFEST
-README
+MANIFEST.SKIP
 Makefile.PL
+README
 t/base.t
 t/gmdate.t
 t/localdate.t
