@@ -120,7 +120,8 @@ SYNOPSIS
       if ($a) { # valid date
         ...
       } else { # invalid date
-        if $a->error == E_INVALID ... 
+        if ($a->error == E_INVALID) { ... }
+        print $a->errstr;
       }
 
       # adjusting DST in calculations  (see the doc)
@@ -258,7 +259,7 @@ USAGE
     "973897262"
         A valid 32-bit integer: This is parsed as a unix time.
 
-    "YYYY-MM-DD hh::mm:ss"
+    "YYYY-MM-DD hh:mm:ss"
         A standard ISO(-like) date format. Additional ".fraction" part is
         ignored, ":ss" can be omitted.
 
@@ -301,7 +302,7 @@ USAGE
         "973897262"
             A valid 32-bit integer is parsed as seconds.
 
-        "YYYY-MM-DD hh::mm:ss"
+        "YYYY-MM-DD hh:mm:ss"
             A standard ISO date format, but this is parsed as relative date
             date and time, so month, day and year can be zero (and defaults
             to zero).
@@ -407,7 +408,8 @@ USAGE
       if ($a) { # valid date
           ...
       } else { # invalid date
-          ...
+          if ($a->error == E_INVALID) { ... }
+          print $a->errstr;
       }
 
     Note even the date is invalid, the expression "defined $a" always
@@ -453,6 +455,8 @@ USAGE
 
         Note, that localdate(undef) will create a valid object, because it
         calls $Class::Date(time).
+
+    You can get the error in string form by calling the "errstr" method.
 
 DST_ADJUST
     $DST_ADJUST is an importable variable, and is a very important

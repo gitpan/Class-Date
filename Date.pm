@@ -1,5 +1,5 @@
 package Class::Date;
-# $Id: Date.pm,v 1.7 2002/03/10 21:00:51 dlux Exp $
+# $Id: Date.pm,v 1.9 2002/08/28 21:38:05 dlux Exp $
 
 require 5.005_03;
 
@@ -33,7 +33,7 @@ BEGIN {
     @EXPORT_OK = (qw( date localdate gmdate now @ERROR_MESSAGES), 
         @{$EXPORT_TAGS{errors}});
 
-    $VERSION = '1.1.0';
+    $VERSION = '1.1.1';
     eval { Class::Date->bootstrap($VERSION); };
     if ($@) {
         warn "Cannot find the XS part of Class::Date, \n".
@@ -206,6 +206,7 @@ sub new_from_scalar_date_parse { my ($s,$date,$tz)=@_;
         Date::Parse::strptime($date);
     $zone = $tz if !defined $zone;
     local $ENV{TZ} = $zone;
+    tzset_xs();
     $ss     = ($lt ||= [ localtime() ])->[0]  if !defined $ss;
     $mm     = ($lt ||= [ localtime() ])->[1]  if !defined $mm;
     $hh     = ($lt ||= [ localtime() ])->[2]  if !defined $hh;
@@ -230,6 +231,7 @@ sub _recalc_from_struct {
     eval {
         local $SIG{__WARN__} = sub { };
         local $ENV{TZ} = $s->[c_tz];
+        tzset_xs();
         $s->[c_epoch] = timelocal(@{$s}[c_sec,c_min,c_hour,c_day,c_mon], 
                 $s->[c_year] + 1900);
     };
@@ -243,6 +245,7 @@ sub _recalc_from_struct {
 
 sub _recalc_from_epoch { my ($s) = @_;
     local $ENV{TZ} = $s->[c_tz];
+    tzset_xs();
     @{$s}[c_year..c_isdst] = (localtime($s->[c_epoch]))[5,4,3,2,1,0,6,7,8];
 }
 
@@ -387,6 +390,7 @@ sub tzoffset { my ($s)=@_;
     return $day + ($h + ($n + $s / 60) / 60) / 24;
   };
   local $ENV{TZ} = $s->[c_tz];
+  tzset_xs();
   # Compute floating offset in hours.
   my $delta = 24 * (&$j(localtime $epoch) - &$j(gmtime $epoch));
   # Return value in seconds rounded to nearest minute.
@@ -418,6 +422,7 @@ sub is_leap_year { my ($s) = @_;
 sub strftime { my ($s,$format)=@_;
   $format ||= "%a, %d %b %Y %H:%M:%S %Z";
   local $ENV{TZ} = $s->[c_tz];
+  tzset_xs();
   return strftime_xs($format,$s->struct);
 }
 
