@@ -1,9 +1,9 @@
 package Class::Date;
 use Time::Local qw(timegm_nocheck timelocal_nocheck);
 
-# $Id: Date.pm,v 1.13 2001/05/22 14:44:40 dlux Exp $
+# $Id: Date.pm,v 1.15 2001/06/11 13:02:19 dlux Exp $
 
-require 5.005;
+require 5.006;
 
 use strict;
 use vars qw(
@@ -21,7 +21,7 @@ BEGIN {
   @EXPORT_OK = qw( date localdate gmdate cs_mon cs_sec now ) 
 }
 
-$VERSION = '0.98';
+$VERSION = '1.0.0';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
