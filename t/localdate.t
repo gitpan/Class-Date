@@ -1,7 +1,7 @@
 use Test;
 use strict;
 BEGIN { 
-  plan tests => 58;
+  plan tests => 62;
 };
 use Class::Date qw(localdate date);
 
@@ -142,4 +142,10 @@ ok $d,11;
 ok $hh,0;
 ok $mm,1;
 ok $ss,2;
+
+# undef comparison
+ok $date11 > undef() ? 1 : 0;
+ok undef() > $date11 ? 0 : 1;
+ok $date13 < undef() ? 0 : 1;
+ok undef() < $date13 ? 1 : 0;
 

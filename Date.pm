@@ -1,6 +1,6 @@
 package Class::Date;
 
-# $Id: Date.pm,v 1.7 2001/04/23 16:33:58 dlux Exp $
+# $Id: Date.pm,v 1.8 2001/04/28 14:41:30 dlux Exp $
 
 require 5.005;
 
@@ -19,7 +19,7 @@ BEGIN {
   @EXPORT_OK = qw( date localdate gmdate cs_mon cs_sec now ) 
 }
 
-$VERSION = '0.94';
+$VERSION = '0.95';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -351,8 +351,9 @@ sub get_epochs {
   if (!isa(ref($rhs), __PACKAGE__ )) {
     $rhs = $lhs->new($rhs);
   }
-  return $rhs->epoch, $lhs->epoch if $reverse;
-  return $lhs->epoch, $rhs->epoch;
+  my $repoch= $rhs ? $rhs->epoch : 0;
+  return $repoch, $lhs->epoch if $reverse;
+  return $lhs->epoch, $repoch;
 }
 
 sub compare {
@@ -638,6 +639,10 @@ Class::Date - Class for easy date and time manipulation
   # comparison between relative dates
   print $reldate1 > $reldate2 ? "I am faster" : "I am slower";
 
+  # Adding / Subtracting months and years are sometimes tricky:
+  print date("2001-01-29") + '1M' - '1M'; # gives "2001-02-01"
+  print date("2000-02-29") + '1Y' - '1Y'; # gives "2000-03-01"
+
 =head1 DESCRIPTION
 
 This module is intended to provide a general-purpose date and datetime type
@@ -850,14 +855,25 @@ this code:
     print $date."\n";
   }
 
+=head1 MONTHS AND YEARS
+
+If you add or subtract "months" and "years" to a date, you may get wrong 
+dates, e.g when you add one month to 2001-01-31, you expect to get
+2001-02-31, but this date is invalid and converted to 2001-03-03. Thats' why
+
+  date("2001-01-31") + '1M' - '1M' != "2001-01-31"
+
+This problem can occur only with months and years, because others can 
+easily be converted to seconds.
+
 =head1 INTERNALS
 
 This module uses operator overloading very heavily. I've found it quite stable,
 but I am afraid of it a bit.
 
-Date::Class object is an array reference.
+A Class::Date object is an array reference.
 
-Date::Class::Rel object is an array reference, which contains month and
+A Class::Date::Rel object is an array reference, which contains month and
 second information. I need to store it as an array ref, because array and month
 values cannot be converted into seconds, because of our super calendar.
 
