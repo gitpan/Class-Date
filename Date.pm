@@ -1,7 +1,7 @@
 package Class::Date;
 use Time::Local qw(timegm timelocal);
 
-# $Id: Date.pm,v 1.19 2001/07/04 10:42:59 dlux Exp $
+# $Id: Date.pm,v 1.20 2001/07/12 13:35:05 dlux Exp $
 
 require 5.005;
 
@@ -43,7 +43,7 @@ BEGIN {
 
 }
 
-$VERSION = '1.0.4';
+$VERSION = '1.0.5';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -636,7 +636,7 @@ use overload
   '<=>'    => "compare",
   'cmp'    => "compare",
   '+'      => "zero",
-  'neg'    => "true",
+  '!'      => "true",
   fallback => 1;
                 
 sub empty { "" }
@@ -1213,7 +1213,7 @@ this module. As you see in the previous section, the focus of development is
 not the speed until 1.0.  For fast date and datetime calculations, use 
 Date::Calc instead.
 
-=head1 BUGS
+=head1 BUGS AND LIMITATIONS
 
 =over 4
 
@@ -1225,6 +1225,22 @@ it is not working for dates beyond 2038 and before 1970. I hope that someone
 will fix this with new time_t in libc. If you really need dates over 2038, 
 you need to completely rewrite this module or use Date::Calc or other date 
 modules.
+
+=item *
+
+This module uses Time::Local, and when it croaks, Class::Date returns
+"Invalid date or time" error message. Time::Local is different in the 5.005
+and 5.6.x version of perl, so the following code will return different
+results:
+
+  $a = date("2006-11-11")->clone(year => -1);
+
+In perl 5.6.1, it returns an invalid date with error message "Invali date or
+time", in perl 5.005 it returns an invalid date with range check error. Both
+are false if you use them in boolean context though, only the error message
+is different, but don't rely on the error message in this case. It however
+works in the same way if you change other fields than "year" to an invalid
+field.
 
 =back
 
