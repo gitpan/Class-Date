@@ -1,5 +1,12 @@
 Revision history for Perl extension Class::Date.
 
+1.0.10  Sun Mar 10 21:45:58 CET 2002
+	- Extend the range of operation to 1902-2038 where the underlying
+	  system (perl, POSIX functions) support
+
+1.0.9   Mon Feb 25 23:19:49 CET 2002
+	- is_leap_year function added
+	
 1.0.8	Wed Nov  7 12:15:28 CET 2001
 	- fix Time::Local detection in perl 5.005_03
 	- The module is now working without a C compiler

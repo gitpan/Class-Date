@@ -1,7 +1,7 @@
 package Class::Date;
-# $Id: Date.pm,v 1.4 2001/10/17 13:08:12 dlux Exp $
+# $Id: Date.pm,v 1.7 2002/03/10 21:00:51 dlux Exp $
 
-require 5.005;
+require 5.005_03;
 
 use strict;
 use vars qw(
@@ -25,7 +25,6 @@ BEGIN {
     } else {
         *timelocal = *Time::Local::timelocal;
         *timegm = *Time::Local::timegm;
-        
     }
 
     @ISA=qw(Exporter DynaLoader);
@@ -53,7 +52,7 @@ BEGIN {
 
 }
 
-$VERSION = '1.0.8';
+$VERSION = '1.0.10';
 eval { Class::Date->bootstrap($VERSION); };
 if ($@) {
     warn "Cannot find the XS part of Class::Date, using strftime from POSIX module.\n"
@@ -222,7 +221,7 @@ sub new_from_scalar_internal { my ($s,$time,$isgmt) = @_;
   } elsif ($time =~ m{ ^\s* ( \d{0,4} ) - ( \d\d? ) - ( \d\d? ) 
      ( \s+ ( \d\d? ) : ( \d\d? ) ( : ( \d\d?  ) (\.\d+)?)? )? }x) {
     my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$5,$6,$8);
-    # ISO date
+    # ISO(-like) date
     return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss],$isgmt);
   }
   else {
@@ -252,8 +251,10 @@ sub _recalc_from_struct {
     eval {
         local $SIG{__WARN__} = sub { };
         $s->[c_epoch] = $s->[c_isgmt] ?
-            timegm(@{$s}[c_sec,c_min,c_hour,c_day,c_mon,c_year]) :
-            timelocal(@{$s}[c_sec,c_min,c_hour,c_day,c_mon,c_year]);
+            timegm(@{$s}[c_sec,c_min,c_hour,c_day,c_mon], 
+                $s->[c_year]+1900) :
+            timelocal(@{$s}[c_sec,c_min,c_hour,c_day,c_mon], 
+                $s->[c_year]+1900);
     };
     return $s->_set_invalid(E_INVALID,$@) if $@;
     my $sum = $s->_check_sum;
@@ -423,6 +424,14 @@ sub month_end { my ($s)=@_;
 
 sub days_in_month {
   shift->month_end->mday;
+}
+
+sub is_leap_year { my ($s) = @_;
+    my $new_date;
+    eval {
+        $new_date = $s->new([$s->year, 2, 29]);
+    } or return 0;
+    return $new_date->day == 29;
 }
 
 sub strftime { my ($s,$format)=@_;
@@ -1267,12 +1276,20 @@ Date::Calc instead.
 
 =item *
 
-This module uses the POSIX functions (but not the POSIX module)
-for date and time calculations, so
-it is not working for dates beyond 2038 and before 1970. I hope that someone 
-will fix this with new time_t in libc. If you really need dates over 2038, 
-you need to completely rewrite this module or use Date::Calc or other date 
-modules.
+This module uses the POSIX functions for date and
+time calculations, so it is not working for dates beyond 2038 and before 1902.
+
+I don't know what systems support dates in 1902-1970 range, it may not work on
+your system because. I know it works on the Linux glibc system with perl 5.6.1
+and 5.7.2. I know it does not work with perl 5.005_03 (It may be the bug of
+the Time::Local module). Please report if you know any system where it does
+_not_ work with perl 5.6.1 or later.
+
+I hope that someone will fix this with new time_t in libc. If you really need
+dates over 2038 and before 1902, you need to completely rewrite this module or
+use Date::Calc or other date modules.
+
+Note: I can use 
 
 =item *
 
