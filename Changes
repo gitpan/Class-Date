@@ -1,5 +1,9 @@
 Revision history for Perl extension Class::Date.
 
+1.0.3	Tue Jul  3 13:09:04 CEST 2001
+	- "errmsg" method is not works as expected
+	- "errstr" is now an alias to "errmsg"
+
 1.0.2   Wed Jun 27 00:08:05 CEST 2001
 	- "set" method is renamed to "clone"
 	- named interface is documented

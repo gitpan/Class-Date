@@ -1,7 +1,7 @@
 package Class::Date;
 use Time::Local qw(timegm timelocal);
 
-# $Id: Date.pm,v 1.17 2001/06/18 09:44:34 dlux Exp $
+# $Id: Date.pm,v 1.18 2001/06/29 08:42:44 dlux Exp $
 
 require 5.005;
 
@@ -9,7 +9,7 @@ use strict;
 use vars qw(
   $VERSION @EXPORT_OK %EXPORT_TAGS @ISA
   $DATE_FORMAT $DST_ADJUST $MONTH_BORDER_ADJUST $RANGE_CHECK
-  @NEW_FROM_SCALAR
+  @NEW_FROM_SCALAR @ERROR_MESSAGES
 );
 use Carp;
 use UNIVERSAL qw(isa);
@@ -19,18 +19,31 @@ use DynaLoader;
 
 BEGIN { 
     @ISA=qw(Exporter DynaLoader);
-    my @ERRORS = qw( E_OK E_INVALID E_RANGE E_UNPARSABLE E_UNDEFINED );
-    @EXPORT_OK = (qw( date localdate gmdate now 
-        cs_mon cs_sec ci_error ci_errmsg ),@ERRORS);
-    %EXPORT_TAGS = ( errors => [ @ERRORS ]);
-
+    my @ERRORS = ( 
+        E_OK         => '',
+        E_INVALID    => 'Invalid date or time',
+        E_RANGE      => 'Range check on date or time failed',
+        E_UNPARSABLE => 'Unparsable date or time: %s',
+        E_UNDEFINED  => 'Undefined date object',
+    );
+    my @ERR;
     # predeclaring error constants
-    for (my $c = 0; $c<@ERRORS; $c++) {
-        eval "sub $ERRORS[$c] () { $c }";
+    my $c = 0;
+    while (@ERRORS) {
+        my $errorcode = shift @ERRORS;
+        my $errorname = shift @ERRORS;
+        eval "sub $errorcode () { $c }";
+        $ERROR_MESSAGES[$c] = $errorname;
+        push @ERR, $errorcode;
+        $c++;
     }
+    @EXPORT_OK = (qw( date localdate gmdate now 
+        cs_mon cs_sec ci_error ci_errmsg @ERROR_MESSAGES),@ERR);
+    %EXPORT_TAGS = ( errors => [ @ERR ]);
+
 }
 
-$VERSION = '1.0.2';
+$VERSION = '1.0.3';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -160,7 +173,7 @@ sub new_from_scalar { my ($s,$time,$isgmt)=@_;
     my $ret=$NEW_FROM_SCALAR[$i]->($s,$time,$isgmt);
     return $ret if defined $ret;
   }
-  return $s->new_invalid(E_UNPARSABLE,"");
+  return $s->new_invalid(E_UNPARSABLE,$time);
 }
 
 sub new_from_scalar_internal { my ($s,$time,$isgmt) = @_;
@@ -292,7 +305,10 @@ sub wdayname { shift->strftime('%A') }
 *day_of_weekname= *wdayname;
 
 sub error { shift->[c_error] }
-sub errmsg { shift->[c_errmsg] }
+sub errmsg { my ($s) = @_;
+    sprintf $ERROR_MESSAGES[ $s->[c_error] ]."\n", $s->[c_errmsg] 
+}
+*errstr = *errmsg;
 
 sub new_invalid { my ($proto,$error,$errmsg) = @_;
     bless([],ref($proto) || $proto)->_set_invalid($error,$errmsg);
@@ -611,7 +627,7 @@ sub mon_part { shift->[cs_mon] }
 
 package Class::Date::Invalid;
 use strict;
-BEGIN { Class::Date->import(qw(ci_error ci_errmsg)) };
+BEGIN { Class::Date->import(qw(ci_error ci_errmsg @ERROR_MESSAGES)) };
 
 use overload 
   '0+'     => "zero",
@@ -630,7 +646,10 @@ sub compare { return ($_[1] ? 1 : 0) * ($_[2] ? -1 : 1) }
 
 sub error { shift->[ci_error]; }
 
-sub errmsg { shift->[ci_errmsg]; }
+sub errmsg { my ($s) = @_;
+    sprintf $ERROR_MESSAGES[ $s->[ci_error] ]."\n", $s->[ci_errmsg] 
+}
+*errstr = *errmsg;
 
 sub AUTOLOAD { undef }
 
