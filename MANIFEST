@@ -5,6 +5,7 @@ MANIFEST
 MANIFEST.SKIP
 Makefile.PL
 README
-t/base.t
-t/gmdate.t
-t/localdate.t
+t/00_base.t
+t/10_fields.t
+t/20_gmdate.t
+t/30_localdate.t

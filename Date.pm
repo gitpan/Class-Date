@@ -1,14 +1,15 @@
 package Class::Date;
-use Time::Local qw(timegm_nocheck timelocal_nocheck);
+use Time::Local qw(timegm timelocal);
 
-# $Id: Date.pm,v 1.15 2001/06/11 13:02:19 dlux Exp $
+# $Id: Date.pm,v 1.16 2001/06/12 07:43:52 dlux Exp $
 
-require 5.006;
+require 5.005;
 
 use strict;
 use vars qw(
-  $VERSION @EXPORT_OK $DATE_FORMAT $DST_ADJUST $MONTH_BORDER_ADJUST
-  @NEW_FROM_SCALAR @ISA
+  $VERSION @EXPORT_OK %EXPORT_TAGS @ISA
+  $DATE_FORMAT $DST_ADJUST $MONTH_BORDER_ADJUST $RANGE_CHECK
+  @NEW_FROM_SCALAR
 );
 use Carp;
 use UNIVERSAL qw(isa);
@@ -17,15 +18,24 @@ use Exporter;
 use DynaLoader;
 
 BEGIN { 
-  @ISA=qw(Exporter DynaLoader);
-  @EXPORT_OK = qw( date localdate gmdate cs_mon cs_sec now ) 
+    @ISA=qw(Exporter DynaLoader);
+    my @ERRORS = qw( E_OK E_INVALID E_RANGE E_UNPARSABLE E_UNDEFINED );
+    @EXPORT_OK = (qw( date localdate gmdate now 
+        cs_mon cs_sec ci_error ci_errmsg ),@ERRORS);
+    %EXPORT_TAGS = ( errors => [ @ERRORS ]);
+
+    # predeclaring error constants
+    for (my $c = 0; $c<@ERRORS; $c++) {
+        eval "sub $ERRORS[$c] () { $c }";
+    }
 }
 
-$VERSION = '1.0.0';
+$VERSION = '1.0.1';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
 $MONTH_BORDER_ADJUST = 0;
+$RANGE_CHECK = 0;
 $DATE_FORMAT="%Y-%m-%d %H:%M:%S";
 
 # constants for Class::Date fields
@@ -40,15 +50,23 @@ use constant c_yday  =>  7;
 use constant c_isdst =>  8;
 use constant c_epoch =>  9;
 use constant c_isgmt => 10;
+use constant c_error => 11;
+use constant c_errmsg=> 12;
+
 # constants for Class::Date::Rel fields
 use constant cs_mon => 0;
 use constant cs_sec => 1;
 
+# constants for Class::Date::Invalid fields
+use constant ci_error => 0;
+use constant ci_errmsg => 1;
+
 # this method is used to determine what is the package name of the relative
-# time class. It is used at the operators. You unly need to redefine it if
+# time class. It is used at the operators. You only need to redefine it if
 # you want to derive both Class::Date and Class::Date::Rel.
-# Look at the ClassDate in the Class::Date::Rel package also.
+# Look at the Class::Date::Rel::ClassDate also.
 use constant ClassDateRel => "Class::Date::Rel";
+use constant ClassDateInvalid => "Class::Date::Invalid";
 
 use overload 
   '""'     => "string",
@@ -88,7 +106,7 @@ sub new { my ($proto,$time,$isgmt)=@_;
   if (defined($time) && isa(ref($proto), __PACKAGE__ )) {
     $isgmt=$proto->[c_isgmt];
   }
-  return undef if !defined $time;
+  return $proto->new_invalid(E_UNDEFINED,"") if !defined $time;
   if (isa($time, __PACKAGE__ )) {
     return $class->new_copy($time,$isgmt);
   } elsif (isa($time,'Class::Date::Rel')) {
@@ -110,7 +128,6 @@ sub new_copy { my ($s,$input,$isgmt)=@_;
   return bless($new_object, ref($s) || $s);
 }
 
-
 sub new_from_array { my ($s,$time,$isgmt) = @_;
   my ($y,$m,$d,$hh,$mm,$ss,$dst) = @$time;
   my $obj= [
@@ -130,11 +147,11 @@ sub new_from_hash { my ($s,$time,$isgmt) = @_;
 sub _array_from_hash { my ($val)=@_;
   [
     $val->{year} || ($val->{_year} ? $val->{_year} + 1900 : 0 ), 
-    $val->{month} || $val->{mon} || ( $val->{_mon} ? $val->{_mon} + 1 : 0 ), 
-    $val->{day_of_month}   || $val->{mday} || $val->{day},
+    $val->{mon} || $val->{month} || ( $val->{_mon} ? $val->{_mon} + 1 : 0 ), 
+    $val->{day}   || $val->{mday} || $val->{day_of_month},
     $val->{hour},
-    $val->{minute} || $val->{min},
-    $val->{second} || $val->{sec},
+    exists $val->{min} ? $val->{min} : $val->{minute},
+    exists $val->{sec} ? $val->{sec} : $val->{second},
   ];
 }
 
@@ -143,7 +160,7 @@ sub new_from_scalar { my ($s,$time,$isgmt)=@_;
     my $ret=$NEW_FROM_SCALAR[$i]->($s,$time,$isgmt);
     return $ret if defined $ret;
   }
-  return undef;
+  return $s->new_invalid(E_UNPARSABLE,"");
 }
 
 sub new_from_scalar_internal { my ($s,$time,$isgmt) = @_;
@@ -187,20 +204,60 @@ sub new_from_scalar_date_parse { my ($s,$data,$isgmt)=@_;
   return $s->new_from_array([$year+1900,$month+1,$day,$hh,$mm,$ss],$isgmt);
 }
 
-sub _recalc_from_struct { my ($s) = @_;
-  $s->[c_isdst] = -1;
-  $s->[c_wday]  = 0;
-  $s->[c_yday]  = 0;
-  $s->[c_epoch] = 0; # these are required to suppress warinngs;
-  $s->[c_epoch] = $s->[c_isgmt] ?
-    timegm_nocheck(@{$s}[c_sec,c_min,c_hour,c_day,c_mon,c_year]) :
-    timelocal_nocheck(@{$s}[c_sec,c_min,c_hour,c_day,c_mon,c_year]);
-  $s->_recalc_from_epoch;
+sub _check_sum { my ($s) = @_;
+  my $sum=0; $sum += $_ || 0 foreach @{$s}[c_year .. c_sec];
+  return $sum;
+}
+sub _recalc_from_struct { 
+    my $s = shift;
+    $s->[c_isdst] = -1;
+    $s->[c_wday]  = 0;
+    $s->[c_yday]  = 0;
+    $s->[c_epoch] = 0; # these are required to suppress warinngs;
+    eval {
+        $s->[c_epoch] = $s->[c_isgmt] ?
+            timegm(@{$s}[c_sec,c_min,c_hour,c_day,c_mon,c_year]) :
+            timelocal(@{$s}[c_sec,c_min,c_hour,c_day,c_mon,c_year]);
+    };
+    return $s->_set_invalid(E_INVALID,$@) if $@;
+    my $sum = $s->_check_sum;
+    $s->_recalc_from_epoch;
+    @$s[c_error,c_errmsg] = (($s->_check_sum != $sum ? E_RANGE : 0), "");
+    return $s->_set_invalid(E_RANGE,"") if $RANGE_CHECK && $s->[c_error];
+    return 1;
 }
 
 sub _recalc_from_epoch { my ($s) = @_;
   @{$s}[c_year..c_isdst]= ( $s->[c_isgmt] ? 
     (gmtime($s->[c_epoch])) : localtime($s->[c_epoch]))[5,4,3,2,1,0,6,7,8];
+}
+
+my $SETHASH = {
+    year   => sub { shift->[c_year] = shift() - 1900 },
+    _year  => sub { shift->[c_year] = shift },
+    month  => sub { shift->[c_mon] = shift() - 1 },
+    _month => sub { shift->[c_mon] = shift },
+    day    => sub { shift->[c_day] = shift },
+    hour   => sub { shift->[c_hour] = shift },
+    min    => sub { shift->[c_min] = shift },
+    sec    => sub { shift->[c_sec] = shift },
+};
+$SETHASH->{mon}    = $SETHASH->{month};
+$SETHASH->{_mon}   = $SETHASH->{_month};
+$SETHASH->{mday}   = $SETHASH->{day_of_month} = $SETHASH->{day};
+$SETHASH->{minute} = $SETHASH->{min};
+$SETHASH->{second} = $SETHASH->{sec};
+
+sub set {
+    my $s = shift;
+    my $new_date = $s->new_copy($s);
+    while (@_) {
+        my $key = shift;
+        my $value = shift;
+        $SETHASH->{$key}->($value,$new_date);
+    };
+    $new_date->_recalc_from_struct;
+    return $new_date;
 }
 
 sub year     { shift->[c_year]  +1900 }
@@ -226,10 +283,26 @@ sub isdst    { shift->[c_isdst] }
 *daylight_savings = \&isdst;
 sub epoch    { shift->[c_epoch] }
 *as_sec      = *epoch; # for compatibility
+
 sub monname  { shift->strftime('%B') }
 *monthname   = *monname;
 sub wdayname { shift->strftime('%A') }
 *day_of_weekname= *wdayname;
+
+sub error { shift->[c_error] }
+sub errmsg { shift->[c_errmsg] }
+
+sub new_invalid { my ($proto,$error,$errmsg) = @_;
+    bless([],ref($proto) || $proto)->_set_invalid($error,$errmsg);
+}
+
+sub _set_invalid { my ($s,$error,$errmsg) = @_;
+    bless($s,$s->ClassDateInvalid);
+    @$s = ();
+    @$s[ci_error, ci_errmsg] = ($error,$errmsg);
+    return $s;
+}
+
 sub hms      { sprintf('%02d:%02d:%02d', @{ shift() }[c_hour,c_min,c_sec]) }
 
 sub ymd { my ($s)=@_;
@@ -251,7 +324,7 @@ sub array { my ($s)=@_;
   @return;
 }
 
-sub aref { return [ shift() -> array() ] }
+sub aref { return [ shift()->array ] }
 *as_array = *aref;
 
 sub struct {
@@ -259,14 +332,18 @@ sub struct {
     [c_sec,c_min,c_hour,c_day,c_mon,c_year,c_wday,c_yday,c_isdst] )
 }
 
-sub sref { return \( shift() -> struct() ) }
+sub sref { return [ shift()->struct ] }
 
 sub href { my ($s)=@_;
   my @struct=$s->struct;
   my $h={};
-  foreach my $key (qw(sec min hour day month year wday yday isdst epoch)) {
-    $h->{key}=shift @struct;
+  foreach my $key (qw(sec min hour day _month _year wday yday isdst)) {
+    $h->{$key}=shift @struct;
   }
+  $h->{epoch} = $s->[c_epoch];
+  $h->{year} = 1900 + $h->{_year};
+  $h->{month} = $h->{_month} + 1;
+  $h->{minute} = $h->{min};
   return $h;
 }
 
@@ -275,6 +352,7 @@ sub href { my ($s)=@_;
 sub hash { return %{ shift->href } }
 
 # Thanks to Tony Olekshy <olekshy@cs.ualberta.ca> for this algorithm
+# ripped from Time::Object by Matt Sergeant
 sub tzoffset { my ($s)=@_;
   my $epoch = $s->[c_epoch];
   my $j = sub { # Tweaked Julian day number algorithm.
@@ -360,7 +438,7 @@ sub add { my ($s,$rhs)=@_;
     $retval->_recalc_from_struct;
 
     # adjust month border if necessary
-    if ($MONTH_BORDER_ADJUST && $expected_month != $retval->[c_mon]) {
+    if ($MONTH_BORDER_ADJUST && $retval && $expected_month != $retval->[c_mon]) {
       $retval->[c_epoch] -= $retval->[c_day]*60*60*24;
       $retval->_recalc_from_epoch;
     }
@@ -387,7 +465,7 @@ sub get_epochs {
 }
 
 sub compare {
-  my ($lhs, $rhs)=get_epochs(@_);
+  my ($lhs, $rhs) = get_epochs(@_);
   return $lhs <=> $rhs;
 }
 
@@ -404,12 +482,12 @@ use constant ClassDate => "Class::Date";
 BEGIN { Class::Date->import(qw(cs_mon cs_sec)) };
 
 use overload 
-  '0+'  => "sec",
-  '""'  => "sec",
-  '<=>' => "compare",
-  'cmp' => "compare",
-  '+'   => "add",
-  'neg' => "neg",
+  '0+'     => "sec",
+  '""'     => "sec",
+  '<=>'    => "compare",
+  'cmp'    => "compare",
+  '+'      => "add",
+  'neg'    => "neg",
   fallback => 1;
                 
 sub new { my ($proto,$val)=@_;
@@ -529,6 +607,31 @@ sub sec_part { shift->[cs_sec] }
 sub mon_part { shift->[cs_mon] } 
 *month_part  = *mon_part;
 
+package Class::Date::Invalid;
+use strict;
+BEGIN { Class::Date->import(qw(ci_error ci_errmsg)) };
+
+use overload 
+  '0+'     => "zero",
+  '""'     => "empty",
+  '<=>'    => "compare",
+  'cmp'    => "compare",
+  '+'      => "zero",
+  'neg'    => "true",
+  fallback => 1;
+                
+sub empty { "" }
+sub zero { 0 }
+sub true { 1 }
+
+sub compare { return ($_[1] ? 1 : 0) * ($_[2] ? -1 : 1) }
+
+sub error { shift->[ci_error]; }
+
+sub errmsg { shift->[ci_errmsg]; }
+
+sub AUTOLOAD { undef }
+
 1;
 __END__
 
@@ -538,7 +641,7 @@ Class::Date - Class for easy date and time manipulation
 
 =head1 SYNOPSIS
 
-  use Class::Date qw(date localdate gmdate now);
+  use Class::Date qw(:errors date localdate gmdate now);
   
   # creating absolute date object (local time)
   $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];
@@ -607,18 +710,32 @@ Class::Date - Class for easy date and time manipulation
 
   ($year,$month,$day,$hour,$min,$sec)=$date->array;
   ($year,$month,$day,$hour,$min,$sec)=@{ $date->aref };
+  # !! $year: 1900-, $month: 1-12
 
   ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst)=$date->struct;
   ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst)=@{ $date->sref };
+  # !! $year: 0-, $month: 0-11
 
-  $hash=$date->href;
+  $hash=$date->href; # $href can be reused as a constructor
   print $hash->{year}."-".$hash->{month}. ... $hash->{sec} ... ;
   
   %hash=$date->hash;
+  # !! $hash{year}: 1900-, $hash{month}: 1-12
+
+  # set part of the date
+  $date->year(2002);
+  $date->_year(102);
+  $date->mon(11);    # 1-12
+  $date->_mon;       # 0-11
 
   $date->month_begin  # First day of the month (date object)
   $date->month_end    # Last day of the month
   $date->days_in_month # 28..31
+
+  # constructing new date based on an existing one:
+  $new_date = $date->set( year => 1977, sec => 14 );
+  # valid keys: year, _year, month, mon, _month, _mon, day, mday, day_of_month,
+  #             hour, min, minute, sec, second
 
   # date format changes
   {
@@ -630,6 +747,14 @@ Class::Date - Class for easy date and time manipulation
     print $date       # result: 1994/10/13
   }
 
+  # error handling
+  $a = date($date_string);
+  if ($a) { # valid date
+    ...
+  } else { # invalid date
+    if $a->error == E_INVALID ... 
+  }
+
   # adjusting DST in calculations  (see the doc)
   $Class::Date::DST_ADJUST = 1; # this is the default
   $Class::Date::DST_ADJUST = 0;
@@ -639,6 +764,12 @@ Class::Date - Class for easy date and time manipulation
   print date("2001-01-31")+'1M'; # will print 2001-03-03
   $Class::Date::MONTH_BORDER_ADJUST = 1;
   print date("2001-01-31")+'1M'; # will print 2001-02-28
+
+  # date range check
+  $Class::Date::RANGE_CHECK = 0; # this is the default
+  print date("2001-02-31"); # will print 2001-03-03
+  $Class::Date::RANGE_CHECK = 1; # this is the default
+  print date("2001-02-31"); # will print nothing
 
   # getting values of a relative date object
   $reldate;              # reldate in seconds (assumed 1 month = 2_629_744 secs)
@@ -850,6 +981,16 @@ You can chop the time value from this object (set hour, min and sec to 0)
 with the "truncate" or "trunc" method. It does not modify the specified
 object, it returns with a new one.
 
+=item set
+
+You can create new date object based on an existing one, by using the "set"
+method. Note, this DOES NOT modify the base object.
+
+  $new_date = $date->set( year => 2001, hour => 14 );
+
+The valid keys are: year, _year, month, mon, _month, _mon, day, mday, 
+day_of_month, hour, min, minute, sec, second.
+
 =item Operations with Class::Date::Rel
 
 The Class::Date::Rel object consists of a month part and a day part. Most
@@ -876,6 +1017,69 @@ and
 You can use the methods methods described at the top of the document 
 if you want to access parts of the data
 which is stored in a Class::Date and Class::Date::Rel object.
+
+=head2 Error handling
+
+If a date object became invalid, then the object will be reblessed to
+Class::Date::Invalid. This object is false in boolean environment, so you can
+test the date validity like this:
+
+  $a = date($input_date);
+  if ($a) { # valid date
+      ...
+  } else { # invalid date
+      ...
+  }
+
+Note even the date is invalid, the expression "defined $a" always returns
+true, so the following is wrong:
+
+  $a = date($input_date);
+  if (defined $a) ... # WRONG!!!!
+
+You can test the error by getting the $date->error value. You might import
+the ":errors" tag:
+
+  use Class::Date qw(:errors);
+
+Possible error values are:
+
+=over 4
+
+=item E_OK
+
+No errors.
+
+=item E_INVALID
+
+Invalid date. It is set when some of the parts of the date are invalid, and
+Time::Local functions cannot convert them to a valid date.
+
+=item E_RANGE
+
+This error is set, when parts of the date are valid, but the whole date is
+not valid, e.g. 2001-02-31. When the $Class::Date::RANGE_CHECK is not set, then
+these date values are automatically converted to a valid date: 2001-03-03,
+but the $date->error value are set to E_RANGE. If $Class::Date::RANGE_CHECK
+is set, then a date "2001-02-31" became invalid date.
+
+=item E_UNPARSABLE
+
+This error is set, when the constructor cannot be created from a scalar, e.g:
+
+  $a = date("4kd sdlsdf lwekrmk");
+
+=item E_UNDEFINED
+
+This error is set, when you want to create a date object from an undefined
+value:
+
+  $a = new Class::Date (undef);
+
+Note, that localdate(undef) will create a valid object, because it calls
+$Class::Date(time).
+
+=back
 
 =head1 DST_ADJUST
 
@@ -947,9 +1151,8 @@ keep compatibility methods in Class::Date. If you have problems regarding
 this, please drop me an email with the description of the problem, and I will
 set the compatibility back.
 
-As of 0.90 this code is in alpha status, and
-I want to release the beta versions (0.91-) soon, and then I want to release the
-version 1.0 if no bugs can be found in that period.
+Invalid dates are Class::Date::Invalid objects. Every method call on this
+object and every operation with this object returns undef or 0.
 
 =head1 DEVELOPMENT FOCUS
 
@@ -963,8 +1166,6 @@ with this was the 'strftime("%s")' problem, I hope it has been solved.
 
 The fourth most important goal was to make it use as low memory as possible.
 It is an issue if someone runs this module under mod_perl.
-
-I hope all these goals can be reached by the 1.0 release.
 
 Speed was not an issue until 1.0, because people usually do not need to do
 tons of date manipulations in a short time. 
@@ -988,7 +1189,7 @@ Date::Calc instead.
 
 This module uses the POSIX functions (but not the POSIX module)
 for date and time calculations, so
-it is not working for dates beyond 2038 and before 1902. I hope that someone 
+it is not working for dates beyond 2038 and before 1970. I hope that someone 
 will fix this with new time_t in libc. If you really need dates over 2038, 
 you need to completely rewrite this module or use Date::Calc or other date 
 modules.
@@ -1013,6 +1214,7 @@ Portions Copiright (c) Matt Sergeant
   - Matt Sergeant <matt@sergeant.org>
     (Lots of code are borrowed from the Time::Object module)
   - Tatsuhiko Miyagawa <miyagawa@cpan.org> (bugfixes)
+  - Stas Bekman <stas@stason.org> (suggestions, bugfix)
 
 =head1 SEE ALSO
 

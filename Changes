@@ -1,5 +1,13 @@
 Revision history for Perl extension Class::Date.
 
+1.0.1   Sat Jun 16 16:14:02 CEST 2001
+	- added a "set" method to change parts of the date
+	- fix the "href" method
+	- Added a $RANGE_CHECK variable, to possiby disable dates like 
+	  "2001-02-31"
+	- Added error handling
+	- Restored compatibility with perl 5.005
+
 1.0.0   Mon Jun 11 14:58:29 CEST 2001
 	- it is now requires perl 5.6 because of using Time::Local
 	- stable release, basically the same as 0.98
