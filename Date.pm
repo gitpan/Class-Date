@@ -1,5 +1,5 @@
 package Class::Date;
-# $Id: Date.pm,v 1.10 2002/12/14 13:58:38 dlux Exp $
+# $Id: Date.pm,v 1.11 2003/01/03 08:10:50 dlux Exp $
 
 require 5.005_03;
 
@@ -33,7 +33,7 @@ BEGIN {
     @EXPORT_OK = (qw( date localdate gmdate now @ERROR_MESSAGES), 
         @{$EXPORT_TAGS{errors}});
 
-    $VERSION = '1.1.2';
+    $VERSION = '1.1.3';
     eval { Class::Date->bootstrap($VERSION); };
     if ($@) {
         warn "Cannot find the XS part of Class::Date, \n".
@@ -440,8 +440,8 @@ sub strftime { my ($s,$format)=@_;
   local $ENV{TZ} = $s->[c_tz];
   # local $ENV{LC_ALL} = "C";
   tzset_xs();
-  my $format = strftime_xs($format,$s->struct);
-  return $format;
+  my $fmt = strftime_xs($format,$s->struct);
+  return $fmt;
 }
 
 sub string { my ($s) = @_;
