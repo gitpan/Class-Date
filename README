@@ -599,6 +599,15 @@ SPEED ISSUES
     calculations, use Date::Calc module instead.
 
 BUGS AND LIMITATIONS
+    *   Perl 5.8.0 and earlier versions has a bug in the strftime code on
+        some operating systems (for example Linux), which is timezone
+        related. I recommend using the strftime, which is provided with
+        Class::Date, so don't try to use the module without the compiled
+        part. The module will not work with a buggy strftime - the test is
+        hardcoded into the beginning of the code. If you anyway want to use
+        the module, remove the hardcoded "die" from the module, but do it
+        for your own risk.
+
     *   This module uses the POSIX functions for date and time calculations,
         so it is not working for dates beyond 2038 and before 1902.
 

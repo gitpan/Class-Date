@@ -1,10 +1,16 @@
 Revision history for Perl extension Class::Date.
 
+1.1.2   Sat Dec 14 14:46:41 CET 2002
+	- Test and report buggy strftime implementation
+	- Fix for strftime
+	- Hardcoded "Class::Date" class names are removed, to enhance
+	  inheritance
+
 1.1.1	Wed Aug 28 23:30:43 CEST 2002
 	- errstr method of Class::Date::Invalid is documented
 	- Timezone set fix for perl 5.8.0
 	- Fix for the missing "tzname" declaration on OSX.
-	- NOTE: gmdate and timezones still not works on win32
+	- NOTE: gmdate and timezone support still does not work on win32!
 
 1.1.0   Mon Jul 15 20:24:04 CEST 2002
 	- Date::Parse support now works well with partly defined dates.

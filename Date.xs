@@ -1,9 +1,9 @@
 /*
  *
- * Some functions (init_tm, mini_mktime, strftime_xs) are borrowed from 
+ * Some functions (mini_mktime, strftime_xs) are borrowed from 
  * Matt Sergeant's Time::Object module
  *
- * $Id: Date.xs,v 1.4 2002/08/28 21:38:05 dlux Exp $
+ * $Id: Date.xs,v 1.5 2002/12/14 13:58:38 dlux Exp $
  *
  */
 
@@ -20,6 +20,20 @@
 /* Mac OSX does not include a definition of tzname in a .h file */
 #if defined (HAS_TZNAME) && defined(__APPLE__) && defined(__MACH__)
 extern char *tzname[2];
+#endif
+
+#define BUFFER_SIZE 254
+
+char buffer[BUFFER_SIZE];
+
+#if 0
+#define CLASSDATE_TM_DEBUG(x) strftime(buffer, BUFFER_SIZE-1, "%Z", &x); \
+    printf("TZ: %5s, %4s,%4s, %02d:%02d:%02d, %02d-%02d-%03d %1d,%03d,%1d,%s:%s\n", \
+        getenv("TZ"), tzname[0], tzname[1], \
+        x.tm_sec, x.tm_min, x.tm_hour, x.tm_mday, x.tm_mon, x.tm_year, x.tm_wday, x.tm_yday,x.tm_isdst, \
+        asctime(&x), buffer)
+#else
+#define CLASSDATE_TM_DEBUG(x)
 #endif
 
 #ifdef __cplusplus
@@ -44,19 +58,6 @@ extern char *tzname[2];
 # ifndef STRUCT_TM_HASZONE
 #    define STRUCT_TM_HASZONE
 # endif
-#endif
-
-#ifdef STRUCT_TM_HASZONE
-static void
-classdate_init_tm(struct tm *ptm)		/* see mktime, strftime and asctime	*/
-{
-    Time_t now;
-    (void)time(&now);
-    Copy(localtime(&now), ptm, 1, struct tm);
-}
-
-#else
-# define classdate_init_tm(ptm)
 #endif
 
 /*
@@ -275,7 +276,7 @@ strftime_xs(fmt, sec, min, hour, mday, mon, year, wday = -1, yday = -1, isdst = 
 	    char tmpbuf[128];
 	    struct tm mytm;
 	    int len;
-	    classdate_init_tm(&mytm);	/* XXX workaround - see classdate_init_tm() above */
+	    bzero(&mytm, sizeof(mytm));
 	    mytm.tm_sec = sec;
 	    mytm.tm_min = min;
 	    mytm.tm_hour = hour;
@@ -286,6 +287,7 @@ strftime_xs(fmt, sec, min, hour, mday, mon, year, wday = -1, yday = -1, isdst = 
 	    mytm.tm_yday = yday;
 	    mytm.tm_isdst = isdst;
 	    classdate_mini_mktime(&mytm);
+	    CLASSDATE_TM_DEBUG(mytm);
 	    len = strftime(tmpbuf, sizeof tmpbuf, fmt, &mytm);
 	    /*
 	    ** The following is needed to handle to the situation where 
@@ -312,6 +314,7 @@ strftime_xs(fmt, sec, min, hour, mday, mon, year, wday = -1, yday = -1, isdst = 
 
 		New(0, buf, bufsize, char);
 		while (buf) {
+		    CLASSDATE_TM_DEBUG(mytm);
 		    buflen = strftime(buf, bufsize, fmt, &mytm);
 		    if (buflen > 0 && buflen < bufsize)
                         break;

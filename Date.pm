@@ -1,5 +1,5 @@
 package Class::Date;
-# $Id: Date.pm,v 1.9 2002/08/28 21:38:05 dlux Exp $
+# $Id: Date.pm,v 1.10 2002/12/14 13:58:38 dlux Exp $
 
 require 5.005_03;
 
@@ -33,7 +33,7 @@ BEGIN {
     @EXPORT_OK = (qw( date localdate gmdate now @ERROR_MESSAGES), 
         @{$EXPORT_TAGS{errors}});
 
-    $VERSION = '1.1.1';
+    $VERSION = '1.1.2';
     eval { Class::Date->bootstrap($VERSION); };
     if ($@) {
         warn "Cannot find the XS part of Class::Date, \n".
@@ -43,6 +43,18 @@ BEGIN {
         *strftime_xs = *POSIX::strftime;
         *tzset_xs = *POSIX::tzset;
         *tzname_xs = *POSIX::tzname;
+    }
+
+    # test if the strftime is buggy
+    local $ENV{LC_ALL} = "C";
+    local $ENV{TZ} = "CET";
+    tzset_xs();
+    if (strftime_xs("%Z",localtime(1020463262)) ne "CEST") {
+        die "You are using a buggy implementation of strftime,\n".
+            "Class::Date is refused to work with it.\n".
+            "If you use the POSIX module for strftime, then try to use the\n".
+            "version, which is provided with Class::Date.\n".
+            "If you still encounter this error, contact the author.\n"
     }
 }
 
@@ -139,7 +151,7 @@ sub new_from_array { my ($s,$time,$tz) = @_;
     $hh||0         , $mm||0   , $ss||0
   ];
   $obj->[c_tz]=$tz;
-  bless $obj,'Class::Date';
+  bless $obj, ref($s) || $s;
   $obj->_recalc_from_struct;
   return $obj;
 }
@@ -172,7 +184,7 @@ sub new_from_scalar_internal { my ($s,$time,$tz) = @_;
 
   if ($time eq 'now') {
     # now string
-    my $obj=bless [],'Class::Date';
+    my $obj=bless [], ref($s) || $s;
     $obj->[c_epoch]=time;
     $obj->[c_tz]=$tz;
     $obj->_recalc_from_epoch;
@@ -183,7 +195,7 @@ sub new_from_scalar_internal { my ($s,$time,$tz) = @_;
     return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss],$tz);
   } elsif ($time =~ /^\s*( \-? \d+ (\.\d+ )? )\s*$/x) {
     # epoch secs
-    my $obj=bless [],'Class::Date';
+    my $obj=bless [], ref($s) || $s;
     $obj->[c_epoch]=$1;
     $obj->[c_tz]=$tz;
     $obj->_recalc_from_epoch;
@@ -206,6 +218,7 @@ sub new_from_scalar_date_parse { my ($s,$date,$tz)=@_;
         Date::Parse::strptime($date);
     $zone = $tz if !defined $zone;
     local $ENV{TZ} = $zone;
+    # local $ENV{LC_ALL} = "C";
     tzset_xs();
     $ss     = ($lt ||= [ localtime() ])->[0]  if !defined $ss;
     $mm     = ($lt ||= [ localtime() ])->[1]  if !defined $mm;
@@ -231,6 +244,7 @@ sub _recalc_from_struct {
     eval {
         local $SIG{__WARN__} = sub { };
         local $ENV{TZ} = $s->[c_tz];
+        # local $ENV{LC_ALL} = "C";
         tzset_xs();
         $s->[c_epoch] = timelocal(@{$s}[c_sec,c_min,c_hour,c_day,c_mon], 
                 $s->[c_year] + 1900);
@@ -245,6 +259,7 @@ sub _recalc_from_struct {
 
 sub _recalc_from_epoch { my ($s) = @_;
     local $ENV{TZ} = $s->[c_tz];
+    # local $ENV{LC_ALL} = "C";
     tzset_xs();
     @{$s}[c_year..c_isdst] = (localtime($s->[c_epoch]))[5,4,3,2,1,0,6,7,8];
 }
@@ -390,6 +405,7 @@ sub tzoffset { my ($s)=@_;
     return $day + ($h + ($n + $s / 60) / 60) / 24;
   };
   local $ENV{TZ} = $s->[c_tz];
+  # local $ENV{LC_ALL} = "C";
   tzset_xs();
   # Compute floating offset in hours.
   my $delta = 24 * (&$j(localtime $epoch) - &$j(gmtime $epoch));
@@ -422,8 +438,10 @@ sub is_leap_year { my ($s) = @_;
 sub strftime { my ($s,$format)=@_;
   $format ||= "%a, %d %b %Y %H:%M:%S %Z";
   local $ENV{TZ} = $s->[c_tz];
+  # local $ENV{LC_ALL} = "C";
   tzset_xs();
-  return strftime_xs($format,$s->struct);
+  my $format = strftime_xs($format,$s->struct);
+  return $format;
 }
 
 sub string { my ($s) = @_;
