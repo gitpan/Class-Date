@@ -1,5 +1,8 @@
 Revision history for Perl extension Class::Date.
 
+0.93    Wed Apr 18 12:55:15 CEST 2001
+	- the return value from Date::Parse is fixed
+
 0.92    Tue Apr 17 17:23:10 CEST 2001
 	- made 'Date::Parse' usage optional
 

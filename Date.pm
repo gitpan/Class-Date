@@ -1,6 +1,6 @@
 package Class::Date;
 
-# $Id: Date.pm,v 1.5 2001/04/17 15:28:58 dlux Exp $
+# $Id: Date.pm,v 1.6 2001/04/18 18:34:17 dlux Exp $
 
 use strict;
 use vars qw(
@@ -17,7 +17,7 @@ BEGIN {
   @EXPORT_OK = qw( date localdate gmdate cs_mon cs_sec ) 
 }
 
-$VERSION = '0.92';
+$VERSION = '0.93';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -170,7 +170,7 @@ sub new_from_scalar_date_parse { my ($s,$data,$isgmt)=@_;
   my ($ss,$mm,$hh,$day,$month,$year)=
     Date::Parse::strptime($data, $isgmt ?  ('GMT') : ())
     or return undef;
-  return $s->new_from_array([$year,$month,$day,$hh,$mm,$ss],$isgmt);
+  return $s->new_from_array([$year+1900,$month+1,$day,$hh,$mm,$ss],$isgmt);
 }
 
 sub _recalc_from_struct { my ($s) = @_;
