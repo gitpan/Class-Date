@@ -187,9 +187,13 @@ USAGE
         A standard ISO date format. Additional ".fraction" part is ignored.
 
     additional input formats
-        This module tries to load Date::Parse module, and if it find it then
-        all these formats can be used as an input. Please refer to the
-        Date::Parse documentation (this part is not tested).
+        You can specify "-DateParse" as an import parameter, e.g:
+
+          use Class::Date qw(date -DateParse);
+
+        With this, the module will try to load Date::Parse module, and if it
+        find it then all these formats can be used as an input. Please refer
+        to the Date::Parse documentation (this part is not tested).
 
   Operations
 

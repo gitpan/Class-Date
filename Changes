@@ -1,5 +1,8 @@
 Revision history for Perl extension Class::Date.
 
+0.92    Tue Apr 17 17:23:10 CEST 2001
+	- made 'Date::Parse' usage optional
+
 0.91	Mon Apr  9 13:42:49 CEST 2001
 	- small bugfixes for perl 5.005
 	- date(undef) and Class::Date::Rel(undef) returns undef

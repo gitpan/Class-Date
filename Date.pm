@@ -1,6 +1,6 @@
 package Class::Date;
 
-# $Id: Date.pm,v 1.4 2001/04/09 11:49:59 dlux Exp $
+# $Id: Date.pm,v 1.5 2001/04/17 15:28:58 dlux Exp $
 
 use strict;
 use vars qw(
@@ -17,7 +17,7 @@ BEGIN {
   @EXPORT_OK = qw( date localdate gmdate cs_mon cs_sec ) 
 }
 
-$VERSION = '0.91';
+$VERSION = '0.92';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -61,6 +61,19 @@ sub localdate ($) { date($_[0] || time,0) }
 
 sub gmdate    ($) { date($_[0] || time,1) }
 
+sub import {
+  my $package=shift;
+  my @exported;
+  foreach my $symbol (@_) {
+    if ($symbol eq '-DateParse') {
+      push @NEW_FROM_SCALAR,\&new_from_scalar_date_parse
+        if !$Class::Date::DateParse++ && eval { require Date::Parse };
+    } else {
+      push @exported,$symbol;
+    }
+  };
+  $package->export_to_level(1,$package,@exported);
+}
 
 sub new { my ($proto,$time,$isgmt)=@_;
   my $class = ref($proto) || $proto;
@@ -133,7 +146,7 @@ sub new_from_scalar_internal { my ($s,$time,$isgmt) = @_;
     # mysql timestamp
     my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$4,$5,$6);
     return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss],$isgmt);
-  } elsif ($time =~ /^\s*( \-? \d+ (\.\d* )? )\s*$/x) {
+  } elsif ($time =~ /^\s*( \-? \d+ (\.\d+ )? )\s*$/x) {
     # epoch secs
     my $obj=bless [],'Class::Date';
     $obj->[c_epoch]=$1;
@@ -153,16 +166,12 @@ sub new_from_scalar_internal { my ($s,$time,$isgmt) = @_;
 
 push @NEW_FROM_SCALAR,\&new_from_scalar_internal;
 
-if (eval { require Date::Parse }) {
-  sub new_from_scalar_date_parse { my ($s,$data,$isgmt)=@_;
-    my ($ss,$mm,$hh,$day,$month,$year)=
-      Date::Parse::strptime($data, $isgmt ?  ('GMT') : ())
-      or return undef;
-    return $s->new_from_array([$year,$month,$day,$hh,$mm,$ss]);
-  }
-  push @NEW_FROM_SCALAR,\&new_from_scalar_date_parse;
+sub new_from_scalar_date_parse { my ($s,$data,$isgmt)=@_;
+  my ($ss,$mm,$hh,$day,$month,$year)=
+    Date::Parse::strptime($data, $isgmt ?  ('GMT') : ())
+    or return undef;
+  return $s->new_from_array([$year,$month,$day,$hh,$mm,$ss],$isgmt);
 }
-
 
 sub _recalc_from_struct { my ($s) = @_;
   $s->[c_isdst] = -1;
@@ -685,7 +694,11 @@ A standard ISO date format. Additional ".fraction" part is ignored.
 
 =item additional input formats
 
-This module tries to load Date::Parse module, and if it find it then all 
+You can specify "-DateParse" as  an import parameter, e.g:
+
+  use Class::Date qw(date -DateParse);
+
+With this, the module will try to load Date::Parse module, and if it find it then all 
 these formats can be used as an input. Please refer to the Date::Parse
 documentation (this part is not tested).
 
