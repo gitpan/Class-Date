@@ -1,0 +1,6 @@
+Revision history for Perl extension Class::Date.
+
+0.01  Sun Mar 11 15:53:38 2001
+	- original version; created by h2xs 1.20 with options
+		-X -n Class::Date
+
