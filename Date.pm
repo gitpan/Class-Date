@@ -1,5 +1,5 @@
 package Class::Date;
-# $Id: Date.pm,v 1.11 2003/01/03 08:10:50 dlux Exp $
+# $Id: Date.pm 58 2003-08-16 12:41:29Z dlux $
 
 require 5.005_03;
 
@@ -34,7 +34,7 @@ BEGIN {
     @EXPORT_OK = (qw( date localdate gmdate now @ERROR_MESSAGES), 
         @{$EXPORT_TAGS{errors}});
 
-    $VERSION = '1.1.6';
+    $VERSION = '1.1.7';
     eval { Class::Date->bootstrap($VERSION); };
     if ($@) {
         warn "Cannot find the XS part of Class::Date, \n".
@@ -235,17 +235,25 @@ sub new_from_scalar_date_parse { my ($s,$date,$tz)=@_;
     my ($ss, $mm, $hh, $day, $month, $year, $zone) =
         Date::Parse::strptime($date);
     $zone = $tz if !defined $zone;
-    my $timecalc = 
-        $zone eq $GMT_TIMEZONE ?
-            \&gmtime : \&localtime;
-    _set_temp_tz($zone, sub {
-        $ss     = ($lt ||= [ $timecalc->() ])->[0]  if !defined $ss;
-        $mm     = ($lt ||= [ $timecalc->() ])->[1]  if !defined $mm;
-        $hh     = ($lt ||= [ $timecalc->() ])->[2]  if !defined $hh;
-        $day    = ($lt ||= [ $timecalc->() ])->[3] if !defined $day;
-        $month  = ($lt ||= [ $timecalc->() ])->[4] if !defined $month;
-        $year   = ($lt ||= [ $timecalc->() ])->[5] if !defined $year;
-    });
+    if ($zone eq $GMT_TIMEZONE) {
+        _set_temp_tz($zone, sub {
+            $ss     = ($lt ||= [ gmtime ])->[0]  if !defined $ss;
+            $mm     = ($lt ||= [ gmtime ])->[1]  if !defined $mm;
+            $hh     = ($lt ||= [ gmtime ])->[2]  if !defined $hh;
+            $day    = ($lt ||= [ gmtime ])->[3] if !defined $day;
+            $month  = ($lt ||= [ gmtime ])->[4] if !defined $month;
+            $year   = ($lt ||= [ gmtime ])->[5] if !defined $year;
+        });
+    } else {
+        _set_temp_tz($zone, sub {
+            $ss     = ($lt ||= [ localtime ])->[0]  if !defined $ss;
+            $mm     = ($lt ||= [ localtime ])->[1]  if !defined $mm;
+            $hh     = ($lt ||= [ localtime ])->[2]  if !defined $hh;
+            $day    = ($lt ||= [ localtime ])->[3] if !defined $day;
+            $month  = ($lt ||= [ localtime ])->[4] if !defined $month;
+            $year   = ($lt ||= [ localtime ])->[5] if !defined $year;
+        });
+    }
     return $s->new_from_array( [$year+1900, $month+1, $day, 
         $hh, $mm, $ss], $zone);
 }
