@@ -4,5 +4,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     'NAME'		=> 'Class::Date',
     'VERSION_FROM'	=> 'Date.pm', # finds $VERSION
-    'PREREQ_PM'		=> {}, # e.g., Module::Name => 1.1
+    'dist'              => { 
+      PREOP => 'perl -MPod::Text -e "pod2text(q(Date.pm))" > README'
+    }
 );

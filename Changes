@@ -1,6 +1,10 @@
 Revision history for Perl extension Class::Date.
 
-0.01  Sun Mar 11 15:53:38 2001
-	- original version; created by h2xs 1.20 with options
-		-X -n Class::Date
+0.90	Thu Apr  5 13:18:18 CEST 2001
+	- Complete rewrite based on Matt Sergeant's Time::Object
+	- Can handle GMT and local time also
+	- A severe bug fixed concerning the Daylight Saving Time
+	- Dependency to POSIX.pm has been removed
+
+0.5     Initial release
 

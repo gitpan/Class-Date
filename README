@@ -1,0 +1,371 @@
+NAME
+    Class::Date - Class for easy date and time manipulation
+
+SYNOPSIS
+      use Class::Date qw(date localdate gmdate $DATE_FORMAT);
+  
+      # creating absolute date object (local time)
+      $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];
+      $date = date [$year,$month,$day,$hour,$min,$sec]; 
+        # "date" is an exportable function, the same as Class::Date->new
+      $date = date { year => $year, month => $month, day => $day,
+        hour => $hour, min => $min, sec => $sec };
+      $date = date "2001-11-12 07:13:12";
+      $date = localdate "2001-12-11";
+      ...
+
+      # creating absolute date object (GMT)
+      $date = new Class::Date [$year,$month,$day,$hour,$min,$sec],1;
+      $date = gmtime "2001-11-12 17:13";
+      ...
+
+      # creating relative date object
+      # (normally you don't need to create this object explicitly)
+      $reldate = new Class::Date::Rel "3Y 1M 3D 6h 2m 4s";
+      $reldate = new Class::Date::Rel "6Y";
+      $reldate = new Class::Date::Rel $secs;  # secs
+      $reldate = new Class::Date::Rel [$year,$month,$day,$hour,$min,$sec];
+      $reldate = new Class::Date::Rel { year => $year, month => $month, day => $day,
+        hour => $hour, min => $min, sec => $sec };
+      $reldate = new Class::Date::Rel "2001-11-12 07:13:12";
+      $reldate = new Class::Date::Rel "2001-12-11";
+
+      # getting values of an absolute date object
+      $date;              # prints the date in default output format (see below)
+      $date->year;        # year, e.g: 2001
+      $date->_year;       # year - 1900, e.g. 101
+      $date->yr;          # 2-digit year 0-99, e.g 1
+      $date->mon;         # month 1..12
+      $date->month;       # same as prev.
+      $date->_mon;        # month 0..11
+      $date->_month;      # same as prev.
+      $date->day;         # day of month
+      $date->mday;        # day of month
+      $date->day_of_month;# same as prev.
+      $date->hour;
+      $date->min;
+      $date->minute;      # same as prev.
+      $date->sec;
+      $date->second;      # same as prev.
+      $date->wday;        # 1 = Sunday
+      $date->_wday;       # 0 = Sunday
+      $date->day_of_week; # same as prev.
+      $date->yday;        
+      $date->day_of_year; # same as prev.
+      $date->isdst;       # DST?
+      $date->daylight_savings; # same as prev.
+      $date->epoch;       # UNIX time_t
+      $date->monname;     # name of month, eg: March
+      $date->monthname;   # same as prev.
+      $date->wdayname;    # Thursday
+      $date->day_of_weekname; # same as prev.
+      $date->hms          # 01:23:45
+      $date->ymd          # 2000/02/29
+      $date->mdy          # 02/29/2000
+      $date->dmy          # 29/02/2000
+      $date->string       # 2000-02-29 12:21:11 (format can be changed, look below)
+      "$date"             # same as prev.
+      $date->tzoffset     # timezone-offset
+      $date->strftime($format) # POSIX strftime (without the huge POSIX.pm)
+
+      ($year,$month,$day,$hour,$min,$sec)=$date->array;
+      ($year,$month,$day,$hour,$min,$sec)=@{ $date->aref };
+
+      ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst)=$date->struct;
+      ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst)=@{ $date->sref };
+
+      $hash=$date->href;
+      print $hash->{year}."-".$hash->{month}. ... $hash->{sec} ... ;
+  
+      %hash=$date->hash;
+
+      # date format changes
+      {
+        local $Class::Date::DATE_FORMAT="%Y%m%d%H%M%S";
+        print $date       # result: 20011222000000
+        $Class::Date::DATE_FORMAT=undef;
+        print $date       # result: Thu Oct 13 04:54:34 1994
+        $Class::Date::DATE_FORMAT="%Y/%m/%d"
+        print $date       # result: 1994/10/13
+      }
+
+      # adjusting DST in calculations  (see the doc)
+      $Class::Date::DST_ADJUST = 1; # this is the default
+      $Class::Date::DST_ADJUST = 0;
+
+      # getting values of a relative date object
+      $reldate;              # reldate in seconds (assumed 1 month = 2_629_744 secs)
+      $reldate->year;
+      $reldate->mon;
+      $reldate->month;       # same as prev.
+      $reldate->day;
+      $reldate->hour;
+      $reldate->min;
+      $reldate->minute;      # same as prev.
+      $reldate->sec;         # same as $reldate
+      $reldate->second;      # same as prev.
+      $reldate->sec_part;    # "second" part of the relative date
+      $reldate->mon_part;    # "month"  part of the relative date
+
+      # arithmetic with dates:
+      print date([2001,12,11,4,5,6])->truncate; 
+                                   # will print "2001-12-11"
+      $new_date = $date+$reldate;
+      $date2    = $date+'3Y';      # 3 Year
+      $date3    = $date+[1,2,3];   # $date plus 1 year, 2 month, 3 days
+      $date4    = $date+'3-1-5'    # $date plus 3 year, 1 month, 5 days
+
+      $new_date = $date-$reldate;
+      $date2    = $date-'3Y';      # 3 Year
+      $date3    = $date-[1,2,3];   # $date minus 1 year, 2 month, 3 days
+      $date4    = $date-'3-1-5'    # $date minus 3 year, 1 month, 5 days
+
+      $new_reldate = $date1-$date2;
+      $reldate2 = Class::Date->new('2000-11-12')-'2000-11-10';
+      $reldate3    = $date3-'1977-11-10';
+
+      $days_between = (Class::Date->new('2001-11-12')-'2001-07-04')->day;
+
+      # comparison between absolute dates
+      print $date1 > $date2 ? "I am older" : "I am younger";
+
+      # comparison between relative dates
+      print $reldate1 > $reldate2 ? "I am faster" : "I am slower";
+
+DESCRIPTION
+    This module is intended to provide a general-purpose date and datetime
+    type for perl. You have a Class::Date class for absolute date and
+    datetime, and have a Class::Date::Rel class for relative dates.
+
+    You can use "+", "-", "<" and ">" operators as with native perl data
+    types.
+
+USAGE
+    If you want to use a date object, you need to do the following:
+
+      - create a new object
+      - do some operations (+, -, comparison)
+      - get result back
+
+  Creating a new date object
+
+    You can create a date object by the "date", "localdate" or "gmdate"
+    function, or by calling the Class::Date constructor.
+
+    "date" and "Class::Date->new" are equivalent, both has two arguments:
+    The date and if the second argument is true then the date interpreted as
+    GMT not local.
+
+      $date1= date [2000,11,12];
+      $date2= Class::Date->new([2000,06,11,13,11,22],1);
+
+    "localdate $x" is equivalent to "date $x", "gmdate $x" is equivalent to
+    "date $x,1":
+
+      $date1= localdate [2000,11,12];
+      $date2= gmdate [2000,4,2,3,33,33];
+
+      $date = localdate(time);
+
+    The format of the accepted input date can be:
+
+    [$year,$month,$day,$hour,$min,$sec]
+        An array reference with 6 elements. The missing elements have
+        default values (year: 2000, month, day: 1, hour, min, sec: 0)
+
+    { year => $year, month => $month, day => $day, hour => $hour, min =>
+    $min, sec => $sec }
+        A hash reference with the same 6 elements as above.
+
+    "YYYYMMDDhhmmss"
+        A mysql-style timestamp value, which consist of at least 14 digit.
+
+    "973897262"
+        A valid 32-bit integer: This is parsed as a unix time.
+
+    "YYYY-MM-DD hh::mm:ss"
+        A standard ISO date format. Additional ".fraction" part is ignored.
+
+    additional input formats
+        This module tries to load Date::Parse module, and if it find it then
+        all these formats can be used as an input. Please refer to the
+        Date::Parse documentation (this part is not tested).
+
+  Operations
+
+    addition
+        You can add the following to a Class::Date object:
+
+          - a valid Class::Date::Rel object
+          - anything, that can be used for creating a new Class::Date::Rel object
+
+        It means that you don't need to create a new Class::Date::Rel object
+        every time when you add something to the Class::Date object, it
+        creates them automatically:
+
+          $date= Class::Date->new('2001-12-11')+Class::Date::Rel->new('3Y');
+
+        is the same as:
+
+          $date= date('2001-12-11')+'3Y';
+
+        You can provide a Class::Date::Rel object in the following form:
+
+        array ref
+            The same format as seen in Class::Date format, except the
+            default values are different: all zero.
+
+        hash ref
+            The same format as seen in Class::Date format, except the
+            default values are different: all zero.
+
+        "973897262"
+            A valid 32-bit integer is parsed as seconds.
+
+        "YYYY-MM-DD hh::mm:ss"
+            A standard ISO date format, but this is parsed as relative date
+            date and time, so month, day and year can be zero (and defaults
+            to zero).
+
+        "12Y 6M 6D 20h 12m 5s"
+            This special string can be used if you don't want to use the ISO
+            format. This string consists of whitespace separated tags, each
+            tag consists of a number and a unit. The units can be:
+
+              Y: year
+              M: month
+              D: day
+              h: hour
+              m: min
+              s: sec
+
+            The number and unit must be written with no space between them.
+
+    substraction
+        The same rules are true for substraction, except you can substract
+        two Class::Date object from each other, and you will get a
+        Class::Date::Rel object:
+
+          $reldate=$date1-$date2;
+          $reldate=date('2001-11-12 12:11:07')-date('2001-10-07 10:3:21');
+
+        In this case, the "month" field of the $reldate object will be 0,
+        and the other fields will contain the difference between two dates;
+
+    comparison
+        You can compare two Class::Date objects, or one Class::Date object
+        and another data, which can be used for creating a new Class::Data
+        object.
+
+        It means that you don't need to bless both objects, one of them can
+        be a simple string, array ref, hash ref, etc (see how to create a
+        date object).
+
+          if ( date('2001-11-12') > date('2000-11-11') ) { ... }
+
+        or
+
+          if ( date('2001-11-12') > '2000-11-11' ) { ... }
+
+    truncate
+        You can chop the time value from this object (set hour, min and sec
+        to 0) with the "truncate" or "trunc" method. It does not modify the
+        specified object, it returns with a new one.
+
+    Operations with Class::Date::Rel
+        The Class::Date::Rel object consists of a month part and a day part.
+        Most people only use the "day" part of it. If you use both part,
+        then you can get these parts with the "sec_part" and "mon_part"
+        method. If you use "sec", "month", etc. methods or if you use this
+        object in a mathematical conent, then this object is converted to
+        one number, which is interpreted as second. The conversion is based
+        on a 30.436 days month. Don't use it too often, because it is
+        confusing...
+
+        If you use Class::Date::Rel in an expression with other Class::Date
+        or Class::Date::Rel objects, then it does what is expected:
+
+          date('2001-11-12')+'1M' will be '2001-12-12'
+
+        and
+
+          date('1996-02-11')+'2M' will be '1996-04-11'
+
+  Accessing data from a Class::Date and Class::Date::Rel object
+
+    You can use the methods methods described at the top of the document if
+    you want to access parts of the data which is stored in a Class::Date
+    and Class::Date::Rel object.
+
+DST_ADJUST
+    $DST_ADJUST is an importable variable, and is a very important
+    configuration option.
+
+    If it is set to true (default), then it adjusts the date and time when
+    the operation switches the border of DST. You will see the difference if
+    you run this code:
+
+      $Class::Date::DST_ADJUST=0;
+      for (my $date=localdate("2000-06-11");$date<"2001-4-5";$date+='1D') {
+        print $date."\n";
+      }
+
+      $Class::Date::DST_ADJUST=1;
+      for (my $date=localdate("2000-06-11");$date<"2001-4-5";$date+='1D') {
+        print $date."\n";
+      }
+
+INTERNALS
+    This module uses operator overloading very heavily. I've found it quite
+    stable, but I am afraid of it a bit.
+
+    Date::Class object is an array reference.
+
+    Date::Class::Rel object is an array reference, which contains month and
+    second information. I need to store it as an array ref, because array
+    and month values cannot be converted into seconds, because of our super
+    calendar.
+
+    You can add code references to the @Class::Date::NEW_FROM_SCALAR and
+    @Class::Date::Rel::NEW_FROM_SCALAR. These arrays are iterated through
+    when a scalar-format date must be parsed. These arrays only have one or
+    two values at initialization. The parameters which the code references
+    got are the same as the "new" method of each class. In this way, you can
+    personalize the date parses as you want.
+
+    As of 0.90, the Class::Date has been rewritten. A lot of code and design
+    decision has been borrowed from Matt Sergeant's Time::Object, and there
+    will be some incompatibility with the previous public version (0.5). I
+    tried to keep compatibility methods in Class::Date. If you have problems
+    regarding this, please drop me an email with the description of the
+    problem, and I will set the compatibility back.
+
+    As of 0.90 this code is in alpha status, and I want to release the beta
+    versions (0.91-) soon, and then I want to release the version 1.0 if no
+    bugs can be found in that period.
+
+BUGS
+    This module uses the POSIX functions for date and time calculations, so
+    it is not working for dates beyond 2038 and before 1902. I hope that
+    someone will fix this with new time_t in libc. If you really need dates
+    over 2038, you need to completely rewrite this module or use Date::Calc
+    or other date modules.
+
+COPYRIGHT
+    Copyright (c) 2001 Szabó, Balázs (dLux)
+
+    All rights reserved. This program is free software; you can redistribute
+    it and/or modify it under the same terms as Perl itself.
+
+    Portions Copiright (c) Matt Sergeant
+
+AUTHOR
+      dLux (Szabó, Balázs) <dlux@kapu.hu>
+
+CREDITS
+      Lots of code are borrowed from the Time::Object module by 
+        Matt Sergeant <matt@sergeant.org>
+
+SEE ALSO
+    perl, Time::Object, Date::Calc.
+

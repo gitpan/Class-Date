@@ -1,5 +1,9 @@
 Changes
 Date.pm
+Date.xs
 MANIFEST
+README
 Makefile.PL
-test.pl
+t/base.t
+t/gmdate.t
+t/localdate.t

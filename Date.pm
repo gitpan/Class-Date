@@ -1,257 +1,411 @@
 package Class::Date;
-use POSIX qw(floor);
-use Exporter;
+
+# $Id: Date.pm,v 1.2 2001/04/05 11:22:24 dlux Exp $
+
 use strict;
-use vars qw(@ISA @EXPORT_OK @PARSE_SCALAR_DATE $VERSION $DEBUG);
-@ISA=qw(Exporter);
-@EXPORT_OK=qw(date);
-
-$VERSION='0.5';
-
-use overload (
-  '""'      => "as_scalar",
-  '0+'      => "as_number",
-  '+'       => "add",
-  '-'       => "subs",
-  '='       => "new",
-  '<=>'     => "cmp",
-  'cmp'     => "cmp",
-  fallback  => 1,
+use vars qw(
+  $VERSION @EXPORT_OK $DATE_FORMAT $DST_ADJUST @NEW_FROM_SCALAR
 );
+use Carp;
+use UNIVERSAL qw(isa);
 
-sub date { Class::Date->new(@_) }
+use base qw(Exporter DynaLoader);
+BEGIN { @EXPORT_OK = qw( date localdate gmdate $DATE_FORMAT cs_mon cs_sec ) }
 
-sub new { my ($class,$input)=@_;
-  if (UNIVERSAL::isa($input,"Class::Date")) {
-    return $class->new_copy($input);
-  } elsif (UNIVERSAL::isa($input,'ARRAY')) {
-    return $class->new_from_array($input);
-  } elsif (UNIVERSAL::isa($input,'SCALAR')) {
-    return $class->new_from_scalar($$input);
-  } elsif (UNIVERSAL::isa($input,'HASH')) {
-    return $class->new_from_hash($input);
-  } elsif ($input && !ref($input)) {
-    return $class->new_from_scalar($input);
+$VERSION = '0.90';
+Class::Date->bootstrap($VERSION);
+
+$DST_ADJUST = 1;
+$DATE_FORMAT="%Y-%m-%d %H:%M:%S";
+
+# constants for Class::Date fields
+use constant c_year  =>  0;
+use constant c_mon   =>  1;
+use constant c_day   =>  2;
+use constant c_hour  =>  3;
+use constant c_min   =>  4;
+use constant c_sec   =>  5;
+use constant c_wday  =>  6;
+use constant c_yday  =>  7;
+use constant c_isdst =>  8;
+use constant c_epoch =>  9;
+use constant c_isgmt => 10;
+# constants for Class::Date::Rel fields
+use constant cs_mon => 0;
+use constant cs_sec => 1;
+
+# this method is used to determine what is the package name of the relative
+# time class. It is used at the operators. You unly need to redefine it if
+# you want to derive both Class::Date and Class::Date::Rel.
+# Look at the ClassDate in the Class::Date::Rel package also.
+use constant ClassDateRel => "Class::Date::Rel";
+
+use overload 
+  '""'     => "string",
+  '-'      => "subtract",
+  '+'      => "add",
+  '<=>'    => "compare",
+  'cmp'    => "compare",
+  fallback => 1;
+
+sub date ($;$) { my ($date,$isgmt)=@_;
+  return __PACKAGE__ -> new($date,$isgmt);
+}
+
+sub localdate ($) { date($_[0] || time,0) }
+
+sub gmdate    ($) { date($_[0] || time,1) }
+
+
+sub new { my ($proto,$time,$isgmt)=@_;
+  my $class = ref($proto) || $proto;
+  
+  if (defined($time) && isa(ref($proto), __PACKAGE__ )) {
+    $isgmt=$proto->[c_isgmt];
+  }
+  if (isa($time, __PACKAGE__ )) {
+    return $class->new_copy($time,$isgmt);
+  } elsif (isa($time,'Class::Date::Rel')) {
+    return $class->new_from_scalar($time,$isgmt);
+  } elsif (ref($time) eq 'ARRAY') {
+    return $class->new_from_array($time,$isgmt);
+  } elsif (ref($time) eq 'SCALAR') {
+    return $class->new_from_scalar($$time,$isgmt);
+  } elsif (ref($time) eq 'HASH') {
+    return $class->new_from_hash($time,$isgmt);
   } else {
-    return undef;
+    return $class->new_from_scalar($time,$isgmt);
   }
 }
 
-sub new_copy { my ($class,$input)=@_;
-  my $new_object=$$input;
-  return bless(\$new_object,ref($class) || $class);
+sub new_copy { my ($s,$input,$isgmt)=@_;
+  my $new_object=[ @$input ];
+  # we don't mind $isgmt!
+  return bless($new_object, ref($s) || $s);
 }
 
-sub new_from_array { my ($class,$input)=@_;
-  my $time=makedate(@$input);
-  return bless(\$time,ref($class) || $class);
+
+sub new_from_array { my ($s,$time,$isgmt) = @_;
+  my ($y,$m,$d,$hh,$mm,$ss,$dst) = @$time;
+  my $obj= [
+    ($y||2000)-1900, ($m||1)-1, $d||1,
+    $hh||0         , $mm||0   , $ss||0
+  ];
+  $obj->[c_isgmt]=$isgmt;
+  bless $obj,'Class::Date';
+  $obj->_recalc_from_struct;
+  return $obj;
 }
 
-sub new_from_hash { my ($class,$input)=@_;
-  $class->new_from_array( [$input->{year}||2000,$input->{month}||1,$input->{day}||1,
-    $input->{hour} || 0, $input->{min} || 0, $input->{sec} || 0 ]);
+sub new_from_hash { my ($s,$time,$isgmt) = @_;
+  $s->new_from_array(_array_from_hash($time),$isgmt);
 }
 
-sub new_from_scalar { my ($class,$input)=@_;
-  my $date=$class->parse_scalar_date($input);
-  return undef if !defined $date;
-  return bless(\$date,ref($class) || $class);
+sub _array_from_hash { my ($val)=@_;
+  [
+    $val->{year} || ($val->{_year} ? $val->{_year} + 1900 : 0 ), 
+    $val->{month} || $val->{mon} || ( $val->{_mon} ? $val->{_mon} + 1 : 0 ), 
+    $val->{day_of_month}   || $val->{mday} || $val->{day},
+    $val->{hour},
+    $val->{minute} || $val->{min},
+    $val->{second} || $val->{sec},
+  ];
 }
 
-sub parse_scalar_date_internal { my ($scalar)=@_;
-  $_=$scalar;
-  return undef if !$_;
-  if (/^\s*(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)\d*\s*$/) { # mysql timestamp
-    my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$4,$5,$6);
-    return makedate($y,$m,$d,$hh,$mm,$ss)
-  } elsif (/^\s*(\-?\d+)\s*$/) {                      # POSIX secs
-    return $1;
-  } elsif (m{ ^\s* ( \d{0,4} ) - ( \d\d? ) - ( \d\d? ) 
-      ( \s+ ( \d\d? ) : ( \d\d? ) : ( \d\d? ) (\.\d+)? )? \s* $ }x) {
-    my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$5,$6,$7);    # ISO date
-    return makedate($y,$m,$d,$hh,$mm,$ss);
-  } else {
-    return undef;
-  };
-}
-
-sub makedate {
-  my ($y,$m,$d,$hh,$mm,$ss)=@_[0,1,2,3,4,5];
-  return POSIX::mktime($ss || 0,$mm || 0,$hh || 0,
-    $d || 1,($m || 1)-1,($y || 2000)-1900,0,0,-1);
-}
-
-push @PARSE_SCALAR_DATE,\&parse_scalar_date_internal;
-
-sub parse_scalar_date { my ($class,$scalar)=@_;
-  for (my $i=0;$i<@PARSE_SCALAR_DATE;$i++) {
-    my $ret=$PARSE_SCALAR_DATE[$i]->($scalar);
+sub new_from_scalar { my ($s,$time,$isgmt)=@_;
+  for (my $i=0;$i<@NEW_FROM_SCALAR;$i++) {
+    my $ret=$NEW_FROM_SCALAR[$i]->($s,$time,$isgmt);
     return $ret if defined $ret;
   }
   return undef;
 }
 
-sub as_scalar { my ($obj)=@_;
-  return sprintf "%04d-%02d-%02d %02d:%02d:%02d",@{ $obj->as_array };
-}
-
-sub as_array { my ($obj)=@_;
-  my ($ss,$mm,$hh,$d,$m,$y)=localtime($$obj);
-  $y+=1900;
-  $m+=1;
-  return [$y,$m,$d,$hh,$mm,$ss];
-}
-
-sub as_hash { my ($obj)=@_;
-  my ($y,$m,$d,$hh,$mm,$ss)=@{ $obj->as_array };
-  return {
-    year  => $y,
-    month => $m,
-    day   => $d,
-    hour  => $hh,
-    min   => $mm,
-    sec   => $ss,
-    as_sec  => $$obj,
+sub new_from_scalar_internal { my ($s,$time,$isgmt) = @_;
+  return undef if !$time;
+        
+  if ($time =~ /^\s*(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)\d*\s*$/) { 
+    # mysql timestamp
+    my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$4,$5,$6);
+    return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss],$isgmt);
+  } elsif ($time =~ /^\s*( \-? \d+ (\.\d* )? )\s*$/x) {
+    # epoch secs
+    my $obj=bless [],'Class::Date';
+    $obj->[c_epoch]=$1;
+    $obj->[c_isgmt]=$isgmt;
+    $obj->_recalc_from_epoch;
+    return $obj;
+  } elsif ($time =~ m{ ^\s* ( \d{0,4} ) - ( \d\d? ) - ( \d\d? ) 
+     ( \s+ ( \d\d? ) : ( \d\d? ) : ( \d\d? ) (\.\d+)? )? }x) {
+    my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$5,$6,$7);
+    # ISO date
+    return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss],$isgmt);
   }
-}
-
-sub as_number { my ($obj)=@_;
-  return $$obj;
-}
-
-sub add { my ($obj1,$obj2)=@_;
-  if (UNIVERSAL::isa($obj2,"Class::Date::Rel")) {
-    return $obj1->add_reldate($obj2);
-  } elsif (my $reldate=Class::Date::Rel->new($obj2)) { # is it a reldate?
-    return $obj1->add_reldate($reldate);
-  } else {
-    return $obj1;
-  }
-}
-
-sub add_reldate { my ($obj1,$obj2)=@_;
-  my $result=$obj1->new_from_scalar($$obj1+$obj2->[2]) or return $obj1;
-  if ($obj2->[0] || $obj2->[1]) { # if we need to add year or month
-    my $res=$result->as_array;
-    $res->[0]+=$obj2->[0];
-    $res->[1]+=$obj2->[1];
-    my $years=floor($res->[1]/12);
-    $res->[1]-=12*$years;
-    $res->[0]+=$years;
-    $result=$obj1->new_from_array($res);
-  }
-  return $result;
-}
-
-sub subs { my ($obj1,$obj2,$reverse)=@_;
-  return $obj2 if $reverse;
-  if (UNIVERSAL::isa($obj2,"Class::Date")) {
-    return Class::Date::Rel->new_from_scalar($$obj1-$$obj2);
-  } elsif (UNIVERSAL::isa($obj2,"Class::Date::Rel")) {
-    return $obj1->add_reldate(-$obj2);
-  } elsif (my $reldate=Class::Date::Rel->new($obj2)) { # is it a reldate?
-    return $obj1->add_reldate(-$reldate);
-  } else {
-    return $obj1;
-  }
-}
-
-sub cmp { my ($obj1,$obj2,$reverse)=@_;
-  my $rev_multiply=$reverse ? -1 : 1;
-  if (UNIVERSAL::isa($obj2,"Class::Date")) {
-    return ($$obj1 <=> $$obj2 ) * $rev_multiply;
-  } else {
-    my $date_obj=$obj1->new($obj2);
-    return ( $$obj1 <=> undef ) * $rev_multiply if !defined $date_obj;
-    return ( $$obj1 <=> $$date_obj ) * $rev_multiply;
-  }
-}
-
-if (eval { require Date::Parse }) {
-  sub parse_scalar_date_date_parse { my ($data)=@_;
-    my ($ss,$mm,$hh,$day,$month,$year)=Date::Parse::strptime($data)
-      or return undef;
-    return makedate($year,$month,$day,$hh,$mm,$ss);
-  }
-  push @PARSE_SCALAR_DATE,\&parse_scalar_date_date_parse;
-}
-
-sub as_sec { ${ shift() } }
-
-sub sec    { shift->as_array->[5] }
-sub min    { shift->as_array->[4] }
-sub hour   { shift->as_array->[3] }
-sub day    { shift->as_array->[2] }
-sub month  { shift->as_array->[1] }
-sub year   { shift->as_array->[0] }
-
-package Class::Date::Rel;
-use strict;
-use vars qw(@PARSE_SCALAR_REL_DATE $DEBUG);
-use POSIX qw(floor);
-
-use overload (
-  '""'      => "as_scalar",
-  '0+'      => 'as_number',
-  '+'       => "add",
-  'neg'     => "neg",
-  '-'       => "subs",
-  '='       => "new",
-  'cmp'     => "cmp",
-  '<=>'     => "cmp",
-  fallback  => 1,
-);
-
-sub new { my ($class,$input)=@_;
-  if (UNIVERSAL::isa($input,"Class::Date::Rel")) {
-    return $class->new_copy($input);
-  } elsif (UNIVERSAL::isa($input,'ARRAY')) {
-    return $class->new_from_array($input);
-  } elsif (UNIVERSAL::isa($input,'SCALAR')) {
-    return $class->new_from_scalar($$input);
-  } elsif (UNIVERSAL::isa($input,'HASH')) {
-    return $class->new_from_hash($input);
-  } elsif (defined $input && !ref($input)) {
-    return $class->new_from_scalar($input);
-  } else {
+  else {
     return undef;
   }
 }
 
-sub new_copy { my ($class,$input)=@_;
-  return bless([@$input],ref($class) || $class);
-};
+push @NEW_FROM_SCALAR,\&new_from_scalar_internal;
 
-sub makereldate {
-  my ($y,$m,$d,$hh,$mm,$ss)=@_;
-  return [$y||0,$m||0,($ss||0)+60*(($mm||0)+60*(($hh||0)+24*($d||0)))];
-}
-
-sub new_from_array { my ($class,$input)=@_;
-  return bless(makereldate(@$input),ref($class) || $class);
-}
-
-sub new_from_hash { my ($class,$input)=@_;
-  $class->new_from_array( [$input->{year}||0, $input->{month}||0, $input->{day}||0,
-    $input->{hour}||0, $input->{min}||0, $input->{sec}||0]);
-}
-
-sub new_from_scalar { my ($class,$input)=@_;
-  my $date=$class->parse_scalar_rel_date($input);
-  return undef if !defined $date;
-  return bless($date,ref($class) || $class);
-}
-
-sub parse_scalar_rel_date_internal { my ($scalar)=@_;
-  my ($y,$m,$d,$hh,$mm,$ss)=(0,0,0,0,0,0);
-  return undef if !defined $scalar;
-  return [0,0,$1] if $scalar =~ /^\s*(\d+)\s*$/;
-  if ($scalar =~ m{ ^\s* ( \d{1,4} ) - ( \d\d? ) - ( \d\d? ) 
-      ( \s+ ( \d\d? ) : ( \d\d? ) : ( \d\d? ) (\.\d+)? )? \s* $ }x ) {
-    my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$5,$6,$7);    # ISO date
-    return makereldate($y,$m,$d,$hh,$mm,$ss);
+if (eval { require Date::Parse }) {
+  sub new_from_scalar_date_parse { my ($s,$data,$isgmt)=@_;
+    my ($ss,$mm,$hh,$day,$month,$year)=
+      Date::Parse::strptime($data, $isgmt ?  ('GMT') : ())
+      or return undef;
+    return $s->new_from_array([$year,$month,$day,$hh,$mm,$ss]);
   }
-  $scalar =~ s{ \G \s* (\d+) \s* (Y|M|D|h|m|s) }{
+  push @NEW_FROM_SCALAR,\&new_from_scalar_date_parse;
+}
+
+
+sub _recalc_from_struct { my ($s) = @_;
+  $s->[c_isdst] = -1;
+  $s->[c_wday]  = 0;
+  $s->[c_yday]  = 0;
+  $s->[c_epoch] = 0; # these are required to suppress warinngs;
+  $s->[c_epoch] = $s->strftime('%s');
+  $s->[c_epoch]+= $s->tzoffset if $s->[c_isgmt];
+  $s->_recalc_from_epoch;
+}
+
+sub _recalc_from_epoch { my ($s) = @_;
+  @{$s}[c_year..c_isdst]= ( $s->[c_isgmt] ? 
+    (gmtime($s->[c_epoch])) : localtime($s->[c_epoch]))[5,4,3,2,1,0,6,7,8];
+}
+
+sub year     { shift->[c_year]  +1900 }
+sub _year    { shift->[c_year]  }
+sub yr       { shift->[c_year]  % 100 }
+sub mon      { shift->[c_mon]   +1 }
+*month       = *mon;
+sub _mon     { shift->[c_mon]   }
+*_month      = *_mon;
+sub day      { shift->[c_day]   }
+*day_of_month= *mday = *day;
+sub hour     { shift->[c_hour]  }
+sub min      { shift->[c_min]   }
+*minute      = *min;
+sub sec      { shift->[c_sec]   }
+*second      = *sec;
+sub wday     { shift->[c_wday]  + 1 }
+sub _wday    { shift->[c_wday]  }
+*day_of_week = *_wday;
+sub yday     { shift->[c_yday]  }
+*day_of_year = *yday;
+sub isdst    { shift->[c_isdst] }
+*daylight_savings = \&isdst;
+sub epoch    { shift->[c_epoch] }
+*as_sec      = *epoch; # for compatibility
+sub monname  { shift->strftime('%B') }
+*monthname   = *monname;
+sub wdayname { shift->strftime('%A') }
+*day_of_weekname= *wdayname;
+sub hms      { sprintf('%02d:%02d:%02d', @{ shift() }[c_hour,c_min,c_sec]) }
+
+sub ymd { my ($s)=@_;
+  sprintf('%04d/%02d/%02d', $s->year, $s->mon, $s->[c_day])
+}
+
+sub mdy { my ($s)=@_;
+  sprintf('%02d/%02d/%04d', $s->mon, $s->[c_day], $s->year)
+}
+
+sub dmy { my ($s)=@_;
+  sprintf('%02d/%02d/%04d', $s->[c_day], $s->mon, $s->year)
+}
+
+sub array { return ( @{ shift() }[c_year..c_sec] ) }
+
+sub aref { return \( shift() -> array() ) }
+*as_array = *aref;
+
+sub struct {
+  return ( @{ shift() }
+    [c_sec,c_min,c_hour,c_day,c_mon,c_year,c_wday,c_yday,c_isdst] )
+}
+
+sub sref { return \( shift() -> struct() ) }
+
+sub href { my ($s)=@_;
+  my @struct=$s->struct;
+  my $h={};
+  foreach my $key (qw(sec min hour day month year wday yday isdst epoch)) {
+    $h->{key}=shift @struct;
+  }
+  return $h;
+}
+
+*as_hash=*href;
+
+sub hash { return %{ shift->href } }
+
+# Thanks to Tony Olekshy <olekshy@cs.ualberta.ca> for this algorithm
+sub tzoffset { my ($s)=@_;
+  my $epoch = $s->[c_epoch];
+  my $j = sub { # Tweaked Julian day number algorithm.
+    my ($s,$n,$h,$d,$m,$y) = @_; $m += 1; $y += 1900;
+    # Standard Julian day number algorithm without constant.
+    my $y1 = $m > 2 ? $y : $y - 1;
+    my $m1 = $m > 2 ? $m + 1 : $m + 13;
+    my $day = int(365.25 * $y1) + int(30.6001 * $m1) + $d;
+    # Modify to include hours/mins/secs in floating portion.
+    return $day + ($h + ($n + $s / 60) / 60) / 24;
+  };
+  # Compute floating offset in hours.
+  my $delta = 24 * (&$j(localtime $epoch) - &$j(gmtime $epoch));
+  # Return value in seconds rounded to nearest minute.
+  return int($delta * 60 + ($delta >= 0 ? 0.5 : -0.5)) * 60;
+}
+
+sub strftime { my ($s,$format)=@_;
+  $format ||= "%a, %d %b %Y %H:%M:%S %Z";
+  return strftime_xs($format,$s->struct);
+}
+
+sub string { my ($s) = @_;
+  $s->strftime($DATE_FORMAT);
+}
+
+sub subtract { my ($s,$rhs)=@_;
+  if (isa(ref($rhs), __PACKAGE__ )) {
+    my $dst_adjust = 0;
+    $dst_adjust = 60*60*( $s->[c_isdst]-$rhs->[c_isdst] ) if $DST_ADJUST;
+    return $s->ClassDateRel->new($s->[c_epoch]-$rhs->[c_epoch]+$dst_adjust);
+  } elsif ($rhs) {
+    return $s->add(-$rhs);
+  } else {
+    return $s;
+  }
+}
+
+sub add { my ($s,$rhs)=@_;
+  $rhs=$s->ClassDateRel->new($rhs) if !isa($rhs,'Class::Date::Rel');
+	
+  return $s if !isa($rhs,'Class::Date::Rel');
+
+  # adding seconds
+  my $retval= $rhs->[cs_sec] ? 
+    $s->new_from_scalar($s->[c_epoch]+$rhs->[cs_sec],$s->[c_isgmt]) :
+    $s->new_copy($s);
+
+  # adding months
+  if ($rhs->[cs_mon]) {
+    $retval->[c_mon]+=$rhs->[cs_mon];
+    my $year_diff= $retval->[c_mon]>0 ? # instead of POSIX::floor
+      int ($retval->[c_mon]/12) :
+      int (($retval->[c_mon]-11)/12);
+    $retval->[c_mon]  -= 12*$year_diff;
+    $retval->[c_year] += $year_diff;
+    $retval->_recalc_from_struct;
+  }
+  
+  # adjust DST if necessary
+  if ( $DST_ADJUST && (my $dstdiff=$retval->[c_isdst]-$s->[c_isdst]))  {
+    $retval->[c_epoch] -= $dstdiff*60*60;
+    $retval->_recalc_from_epoch;
+  }
+  
+  # sigh! We finished!
+  return $retval;
+}
+
+sub trunc { my ($s)=@_;
+  $s->new_from_array([@{$s}[c_year,c_mon,c_day],0,0,0],$s->[c_isgmt]);
+  $s->[c_sec]=0;
+  $s->[c_min]=0;
+  $s->[c_hour]=0;
+  $s->_recalc_from_struct;
+  $s;
+}
+
+*truncate = *trunc;
+
+sub get_epochs {
+  my ($lhs,$rhs,$reverse)=@_;
+  if (!isa(ref($rhs), __PACKAGE__ )) {
+    $rhs = $lhs->new($rhs);
+  }
+  return $rhs->epoch, $lhs->epoch if $reverse;
+  return $lhs->epoch, $rhs->epoch;
+}
+
+sub compare {
+  my ($lhs, $rhs)=get_epochs(@_);
+  return $lhs <=> $rhs;
+}
+
+package Class::Date::Rel;
+use strict;
+use vars qw(@NEW_FROM_SCALAR);
+use UNIVERSAL qw(isa);
+
+use constant SEC_PER_MONTH => 2_629_744;
+
+# see the ClassDateRel const in package Class::Date
+use constant ClassDate => "Class::Date";
+
+BEGIN { Class::Date->import qw(cs_mon cs_sec) };
+
+use overload 
+  '0+'  => "sec",
+  '""'  => "sec",
+  '<=>' => "compare",
+  'cmp' => "compare",
+  '+'   => "add",
+  'neg' => "neg",
+  fallback => 1;
+                
+sub new { my ($proto,$val)=@_;
+  my $class = ref($proto) || $proto;
+  if (isa(ref($val), __PACKAGE__ )) {
+    return $class->new_copy($val);
+  } elsif (ref($val) eq 'ARRAY') {
+    return $class->new_from_array($val);
+  } elsif (ref($val) eq 'HASH') {
+    return $class->new_from_hash($val);
+  } elsif (ref($val) eq 'SCALAR') {
+    return $class->new_from_scalar($$val);
+  } else {
+    return $class->new_from_scalar($val);
+  };
+}
+
+sub new_copy { my ($s,$val)=@_;
+  return bless([@$val], ref($s)||$s);
+}
+
+sub new_from_array { my ($s,$val) = @_;
+  my ($y,$m,$d,$hh,$mm,$ss) = @$val;
+  return bless([ ($y || 0) * 12 + $m , ($ss || 0) + 
+    60*(($mm || 0) + 60*(($hh || 0) + 24* ($d || 0))) ], ref($s)||$s);
+}
+
+sub new_from_hash { my ($s,$val) = @_;
+  $s->new_from_array(Class::Date::_array_from_hash($val));
+}
+
+sub new_from_scalar { my ($s,$val)=@_;
+  for (my $i=0;$i<@NEW_FROM_SCALAR;$i++) {
+    my $ret=$NEW_FROM_SCALAR[$i]->($s,$val);
+    return $ret if defined $ret;
+  }
+  return undef;
+}
+
+sub new_from_scalar_internal { my ($s,$val)=@_;
+  return undef if !defined $val;
+  return bless([0,$1],ref($s) || $s) 
+    if $val =~ / ^ \s* ( \-? \d+ ( \. \d* )? ) \s* $/x;
+
+  if ($val =~ m{ ^\s* ( \d{1,4} ) - ( \d\d? ) - ( \d\d? ) 
+      ( \s+ ( \d\d? ) : ( \d\d? ) : ( \d\d? ) (\.\d+)? )? }x ) {
+    # ISO date
+    my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$5,$6,$7);
+    return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss]);
+  }
+
+  my ($y,$m,$d,$hh,$mm,$ss)=(0,0,0,0,0,0);
+  $val =~ s{ \G \s* ( \-? \d+) \s* (Y|M|D|h|m|s) }{
     my ($num,$cmd)=($1,$2);
     if ($cmd eq 'Y') {
       $y=$num;
@@ -268,135 +422,80 @@ sub parse_scalar_rel_date_internal { my ($scalar)=@_;
     }
     "";
   }gexi;
-  return makereldate($y,$m,$d,$hh,$mm,$ss)
+  return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss]);
 }
 
-push @PARSE_SCALAR_REL_DATE,\&parse_scalar_rel_date_internal;
+push @NEW_FROM_SCALAR,\&new_from_scalar_internal;
 
-sub parse_scalar_rel_date { my ($class,$scalar)=@_;
-  for (my $i=0;$i<@PARSE_SCALAR_REL_DATE;$i++) {
-    my $ret=$PARSE_SCALAR_REL_DATE[$i]->($scalar);
-    return $ret if defined $ret;
-  }
-  return undef;
-}
-
-sub add { my ($obj1,$obj2)=@_;
-  if (UNIVERSAL::isa($obj2,"Class::Date")) {
-    return $obj2->add($obj1);
-  } elsif (my $reldate=$obj1->new($obj2)) {
-    return $obj1->new_from_array([
-      $obj1->[0]+$reldate->[0],
-      $obj1->[1]+$reldate->[1],
-      0,
-      0,
-      0,
-      $obj1->[2]+$reldate->[2],
-    ]);
-  } else {
-    return $obj1;
-  }
-}
-
-sub subs { my ($obj1,$obj2,$reverse)=@_;
-  return $obj2 if $reverse;
-  if (my $reldate=$obj1->new($obj2)) {
-    return $obj1->new_from_array([
-      $obj1->[0]-$reldate->[0],
-      $obj1->[1]-$reldate->[1],
-      0,
-      0,
-      0,
-      $obj1->[2]-$reldate->[2],
-    ]);
-  } else {
-    return $obj1;
-  }
-}
-
-sub neg { my ($obj1)=@_;
-  return $obj1->new_from_array([
-    -$obj1->[0],
-    -$obj1->[1],
-    0,
-    0,
-    0,
-    -$obj1->[2],
-  ]);
-}
-
-sub cmp { my ($obj1,$obj2,$reverse)=@_;
+sub compare { my ($s,$val2,$reverse) = @_;
   my $rev_multiply=$reverse ? -1 : 1;
-  if (UNIVERSAL::isa($obj2,"Class::Date::Rel")) {
-    return ($obj1->as_number <=> $obj2->as_number) * $rev_multiply;
+  if (isa($val2, __PACKAGE__ )) {
+    return ($s->sec <=> $val2->sec) * $rev_multiply;
   } else {
-    my $date_obj=$obj1->new($obj2);
-    return ($obj1->as_number <=> undef) * $rev_multiply if !defined $date_obj;
-    return ($obj1->as_number <=> $date_obj->as_number) * $rev_multiply;
+    my $date_obj=$s->new($val2);
+    return ($s->sec <=> 0) * $rev_multiply if !defined $date_obj;
+    return ($s->sec <=> $date_obj->sec) * $rev_multiply;
   }
 }
 
-sub as_scalar { my ($obj)=@_;
-  return sprintf "%04d-%02d-%02d %02d:%02d:%02d",@{ $obj->as_array };
-}
-
-sub as_array { my ($obj)=@_;
-  my $sec=$obj->[2] % 60;
-  my $val=floor($obj->[2]/60);
-  my $min=$val % 60;
-  $val=floor($val/60);
-  my $hour= $val % 24;
-  $val=floor($val/24);
-  my $day= $val;
-  return [$obj->[0],$obj->[1],$day,$hour,$min,$sec];
-}
-
-sub as_hash { my ($obj)=@_;
-  my ($y,$m,$d,$hh,$mm,$ss)=@{ $obj->as_array };
-  return {
-    year  => $y,
-    month => $m,
-    day   => $d,
-    hour  => $hh,
-    min   => $mm,
-    sec   => $ss,
-    as_sec => $obj->as_sec,
-    as_day => $obj->as_day,
+sub add { my ($s,$val2)=@_;
+  if (my $reldate=$s->new($val2)) {
+    my $months=$s->[cs_mon] + $reldate->[cs_mon];
+    my $secs  =$s->[cs_sec] + $reldate->[cs_sec];
+    return $s->new_from_hash({ month => $months, sec => $secs }) if $months;
+    return $secs;
+  } else {
+    return $s;
   }
 }
 
-sub as_number { my ($obj)=@_;
-  return $obj->[2]+60*60*24*(31*$obj->[1]+366*$obj->[0]);
+sub neg { my ($s)=@_;
+  return $s->new_from_hash({
+      month => -$s->[cs_mon],
+      sec   => -$s->[cs_sec]
+  });
 }
 
-sub as_sec { shift->[2] }
-sub as_day { shift->as_sec/(24*60*60) }
+sub year     { shift->sec / (SEC_PER_MONTH*12) }
+sub mon      { shift->sec / SEC_PER_MONTH }
+*month       = *mon;
+sub day      { shift->sec / (60*60*24) }
+sub hour     { shift->sec / (60*60)  }
+sub min      { shift->sec / 60  }
+*minute      = *min;
+sub sec { my ($s)=@_; $s->[cs_sec] + SEC_PER_MONTH * $s->[cs_mon]; }
+*second      = *sec;
 
-sub sec    { shift->as_array->[5] }
-sub min    { shift->as_array->[4] }
-sub hour   { shift->as_array->[3] }
-sub day    { shift->as_array->[2] }
-sub month  { shift->[1] }
-sub year   { shift->[0] }
+sub sec_part { shift->[cs_sec] }
+*second_part = *sec_part;
+sub mon_part { shift->[cs_mon] } 
+*month_part  = *mon_part;
 
+1;
 __END__
 
 =head1 NAME
 
-Class::Date - Class for easy date manipulation
+Class::Date - Class for easy date and time manipulation
 
 =head1 SYNOPSIS
 
-  use Class::Date qw(date);
+  use Class::Date qw(date localdate gmdate $DATE_FORMAT);
   
-  # creating absolute date object
+  # creating absolute date object (local time)
   $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];
   $date = date [$year,$month,$day,$hour,$min,$sec]; 
     # "date" is an exportable function, the same as Class::Date->new
   $date = date { year => $year, month => $month, day => $day,
     hour => $hour, min => $min, sec => $sec };
   $date = date "2001-11-12 07:13:12";
-  $date = date "2001-12-11";
+  $date = localdate "2001-12-11";
+  ...
+
+  # creating absolute date object (GMT)
+  $date = new Class::Date [$year,$month,$day,$hour,$min,$sec],1;
+  $date = gmtime "2001-11-12 17:13";
+  ...
 
   # creating relative date object
   # (normally you don't need to create this object explicitly)
@@ -410,35 +509,85 @@ Class::Date - Class for easy date manipulation
   $reldate = new Class::Date::Rel "2001-12-11";
 
   # getting values of an absolute date object
-  print $date;
-  print $date->year;
-  print $date->month;
-  print $date->day;
-  print $date->hour;
-  print $date->min;
-  print $date->sec;
-  print $date->as_sec; # UNIX time_t
-  ($year,$month,$day,$hour,$min,$sec)=@{ $date->as_array };
-  $hash=$date->as_hash;
-  print $hash->{year}."-".$hash->{month}. ... 
-        ... .$hash->{sec}." ".$hash->{as_sec};
+  $date;              # prints the date in default output format (see below)
+  $date->year;        # year, e.g: 2001
+  $date->_year;       # year - 1900, e.g. 101
+  $date->yr;          # 2-digit year 0-99, e.g 1
+  $date->mon;         # month 1..12
+  $date->month;       # same as prev.
+  $date->_mon;        # month 0..11
+  $date->_month;      # same as prev.
+  $date->day;         # day of month
+  $date->mday;        # day of month
+  $date->day_of_month;# same as prev.
+  $date->hour;
+  $date->min;
+  $date->minute;      # same as prev.
+  $date->sec;
+  $date->second;      # same as prev.
+  $date->wday;        # 1 = Sunday
+  $date->_wday;       # 0 = Sunday
+  $date->day_of_week; # same as prev.
+  $date->yday;        
+  $date->day_of_year; # same as prev.
+  $date->isdst;       # DST?
+  $date->daylight_savings; # same as prev.
+  $date->epoch;       # UNIX time_t
+  $date->monname;     # name of month, eg: March
+  $date->monthname;   # same as prev.
+  $date->wdayname;    # Thursday
+  $date->day_of_weekname; # same as prev.
+  $date->hms          # 01:23:45
+  $date->ymd          # 2000/02/29
+  $date->mdy          # 02/29/2000
+  $date->dmy          # 29/02/2000
+  $date->string       # 2000-02-29 12:21:11 (format can be changed, look below)
+  "$date"             # same as prev.
+  $date->tzoffset     # timezone-offset
+  $date->strftime($format) # POSIX strftime (without the huge POSIX.pm)
+
+  ($year,$month,$day,$hour,$min,$sec)=$date->array;
+  ($year,$month,$day,$hour,$min,$sec)=@{ $date->aref };
+
+  ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst)=$date->struct;
+  ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst)=@{ $date->sref };
+
+  $hash=$date->href;
+  print $hash->{year}."-".$hash->{month}. ... $hash->{sec} ... ;
+  
+  %hash=$date->hash;
+
+  # date format changes
+  {
+    local $Class::Date::DATE_FORMAT="%Y%m%d%H%M%S";
+    print $date       # result: 20011222000000
+    $Class::Date::DATE_FORMAT=undef;
+    print $date       # result: Thu Oct 13 04:54:34 1994
+    $Class::Date::DATE_FORMAT="%Y/%m/%d"
+    print $date       # result: 1994/10/13
+  }
+
+  # adjusting DST in calculations  (see the doc)
+  $Class::Date::DST_ADJUST = 1; # this is the default
+  $Class::Date::DST_ADJUST = 0;
 
   # getting values of a relative date object
-  print $reldate;
-  print $reldate->year;
-  print $reldate->month;
-  print $reldate->day;
-  print $reldate->hour;
-  print $reldate->min;
-  print $reldate->sec;
-  print $reldate->as_sec; # calculated from "sec","min","hour" and "day"
-  print $reldate->as_day; # "as_sec" divided by 24*60*60, can be fractional!
-  ($year,$month,$day,$hour,$min,$sec)=@{ $reldate->as_array };
-  $hash=$reldate->as_hash;
-  print $hash->{year}."-".$hash->{month}. ... 
-        ... .$hash->{sec}." ".$hash->{as_sec};
+  $reldate;              # reldate in seconds (assumed 1 month = 2_629_744 secs)
+  $reldate->year;
+  $reldate->mon;
+  $reldate->month;       # same as prev.
+  $reldate->day;
+  $reldate->hour;
+  $reldate->min;
+  $reldate->minute;      # same as prev.
+  $reldate->sec;         # same as $reldate
+  $reldate->second;      # same as prev.
+  $reldate->sec_part;    # "second" part of the relative date
+  $reldate->mon_part;    # "month"  part of the relative date
 
   # arithmetic with dates:
+  print date([2001,12,11,4,5,6])->truncate; 
+                               # will print "2001-12-11"
   $new_date = $date+$reldate;
   $date2    = $date+'3Y';      # 3 Year
   $date3    = $date+[1,2,3];   # $date plus 1 year, 2 month, 3 days
@@ -463,9 +612,11 @@ Class::Date - Class for easy date manipulation
 
 =head1 DESCRIPTION
 
-This module provides a date type for perl. You can create Class::Date objects 
-for absolute dates, Class::Date::Rel objects for relative dates
-and you can use "+", "-", "<" and ">" operators as with native perl data types. 
+This module is intended to provide a general-purpose date and datetime type
+for perl. You have a Class::Date class for absolute date and datetime, and have 
+a Class::Date::Rel class for relative dates.
+
+You can use "+", "-", "<" and ">" operators as with native perl data types.
 
 =head1 USAGE
 
@@ -477,11 +628,23 @@ If you want to use a date object, you need to do the following:
 
 =head2 Creating a new date object
 
-You can create a date object by the "date" function, or by calling the 
-Class::Date constructor (these are equivalent):
+You can create a date object by the "date", "localdate" or "gmdate" function, 
+or by calling the Class::Date constructor.
+
+"date" and "Class::Date->new" are equivalent, both has two arguments: The
+date and if the second argument is true then the date interpreted as GMT not
+local.
 
   $date1= date [2000,11,12];
-  $date2= Class::Date->new([2000,11,12]);
+  $date2= Class::Date->new([2000,06,11,13,11,22],1);
+
+"localdate $x" is equivalent to "date $x", "gmdate $x" is equivalent to
+"date $x,1":
+
+  $date1= localdate [2000,11,12];
+  $date2= gmdate [2000,4,2,3,33,33];
+
+  $date = localdate(time);
 
 The format of the accepted input date can be:
 
@@ -586,7 +749,7 @@ object:
   $reldate=$date1-$date2;
   $reldate=date('2001-11-12 12:11:07')-date('2001-10-07 10:3:21');
 
-In this case, the "month" and "year" field of the $reldate object will be 0,
+In this case, the "month" field of the $reldate object will be 0,
 and the other fields will contain the difference between two dates;
 
 =item comparison
@@ -603,105 +766,114 @@ or
 
   if ( date('2001-11-12') > '2000-11-11' ) { ... }
 
+=item truncate
+
+You can chop the time value from this object (set hour, min and sec to 0)
+with the "truncate" or "trunc" method. It does not modify the specified
+object, it returns with a new one.
+
 =item Operations with Class::Date::Rel
 
-You can do the operations mentioned above on the Class::Date::Rel objects also,
-but do it only when you know what you are doing! You cannot compare two
-different relative dates only if you use fixed length months and fixed length
-years. The module currently uses a 366-day year and a 31-day month for the
-comparison, but this is only used if you want to compare two relative date!
+The Class::Date::Rel object consists of a month part and a day part. Most
+people only use the "day" part of it. If you use both part, then you can get
+these parts with the "sec_part" and "mon_part" method. If you use "sec",
+"month", etc. methods or if you use this object in a mathematical conent,
+then this object is converted to one number, which is interpreted as second.
+The conversion is based on a 30.436 days month. Don't use it too often,
+because it is confusing...
 
-Every other cases (like date('2001-11-12')+'1M') the date value is incremented
-with one month, not 31 days!
+If you use Class::Date::Rel in an expression with other Class::Date or
+Class::Date::Rel objects, then it does what is expected: 
 
-Virtually a relative date consist of 3 parts: "second","month" and "year".
-Day, hour, min and sec all can be converted to the "second" value, but month
-or year doesn't. This is why these are handled differently.
+  date('2001-11-12')+'1M' will be '2001-12-12'
 
-So keep it in mind: days, years and months are not convertible to each other
-in Class::Date::Rel.
+and
+
+  date('1996-02-11')+'2M' will be '1996-04-11'
 
 =back
 
 =head2 Accessing data from a Class::Date and Class::Date::Rel object
 
-You can use the following methods if you want to access parts of the data
-which is stored in a Class::Date and Class::Date::Rel object:
+You can use the methods methods described at the top of the document 
+if you want to access parts of the data
+which is stored in a Class::Date and Class::Date::Rel object.
 
-  $x->year;
-  $x->month;
-  $x->day;
-  $x->hour;
-  $x->min;
-  $x->sec;
-  $x->as_sec;
+=head1 DST_ADJUST
 
-$x->as_sec is a bit special in the case of Class::Date::Rel, because it 
-contains only that parts of the object, which can be converted to second. year
-and month cannot be converted, so these fields are not included.
+$DST_ADJUST is an importable variable, and is a very important configuration
+option.
 
-$x->as_sec returns the seconds elapsed from the UNIX epoch in the case of a
-Class::Date::Rel object, so there is no problem here.
+If it is set to true (default), then it adjusts the date and time when the
+operation switches the border of DST. You will see the difference if you run
+this code:
 
-If you want to get more than one part of the date, you can use the 
-following methods:
+  $Class::Date::DST_ADJUST=0;
+  for (my $date=localdate("2000-06-11");$date<"2001-4-5";$date+='1D') {
+    print $date."\n";
+  }
 
-  my ($y,$m,$d,$hh,$mm,$ss)=@{ $x->as_array }
-
-or
-
-  my $hashref= $x->as_hash;
-
-Class::Date::Rel has a $x->as_day method, which is the same as $x-as_sec, but
-divided by 24*60*60 to get the result in days, not in seconds.
+  $Class::Date::DST_ADJUST=1;
+  for (my $date=localdate("2000-06-11");$date<"2001-4-5";$date+='1D') {
+    print $date."\n";
+  }
 
 =head1 INTERNALS
 
 This module uses operator overloading very heavily. I've found it quite stable,
 but I am afraid of it a bit.
 
-Date::Class object is a scalar reference, which contains the UNIX timestamp
-format of the date.
+Date::Class object is an array reference.
 
-Date::Class::Rel object is an array reference, which contains year, month and
+Date::Class::Rel object is an array reference, which contains month and
 second information. I need to store it as an array ref, because array and month
 values cannot be converted into seconds, because of our super calendar.
 
-=head1 TODO
+You can add code references to the @Class::Date::NEW_FROM_SCALAR and
+@Class::Date::Rel::NEW_FROM_SCALAR. These arrays are iterated through when a
+scalar-format date must be parsed. These arrays only have one or two values
+at initialization. The parameters which the code references got are the same 
+as the "new" method of each class. In this way, you can personalize the date
+parses as you want.
 
-I personally think this module is quite usable right now, but it lacks the
-"sugar" features, which can be found other Date-specific modules, like
-business-date calculations, different date-style parsing, day-of-week, etc.
+As of 0.90, the Class::Date has been rewritten. A lot of code and design
+decision has been borrowed from Matt Sergeant's Time::Object, and there will
+be some incompatibility with the previous public version (0.5). I tried to
+keep compatibility methods in Class::Date. If you have problems regarding
+this, please drop me an email with the description of the problem, and I will
+set the compatibility back.
 
-I don't want to write it again, but I may wrap that functionality around if
-the specific module is available.
-
-I have problems with the different style of date-parsing, because Date::Calc
-has 2 different date-parsing function, Decode_Date_EU and Decode_Date_US. I
-cannot use them, because I cannot decide which parser I can use (if I am
-in the US or in EU).
-
-Suggestions welcome.
+As of 0.90 this code is in alpha status, and
+I want to release the beta versions (0.91-) soon, and then I want to release the
+version 1.0 if no bugs can be found in that period.
 
 =head1 BUGS
 
 This module uses the POSIX functions for date and time calculations, so
-it is not working for dates beyond 2038 and before 1902. I hope the someone will fix this with new
-time_t in libc. If you really need dates over 2038, you need to completely
-rewrite this module or use Date::Calc or other Date modules.
+it is not working for dates beyond 2038 and before 1902. I hope that someone 
+will fix this with new time_t in libc. If you really need dates over 2038, 
+you need to completely rewrite this module or use Date::Calc or other date 
+modules.
 
 =head1 COPYRIGHT
 
-Copyrigh (c) 2001 Szabó, Balázs (dLux)
+Copyright (c) 2001 Szabó, Balázs (dLux)
 
 All rights reserved. This program is free software; you can redistribute it 
 and/or modify it under the same terms as Perl itself.
 
+Portions Copiright (c) Matt Sergeant
+
 =head1 AUTHOR
 
-dLux (Szabó, Balázs) <dlux@kapu.hu>
+  dLux (Szabó, Balázs) <dlux@kapu.hu>
+
+=head1 CREDITS
+
+  Lots of code are borrowed from the Time::Object module by 
+    Matt Sergeant <matt@sergeant.org>
 
 =head1 SEE ALSO
 
-perl(1).
+perl, Time::Object, Date::Calc.
 
