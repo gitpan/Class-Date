@@ -40,7 +40,7 @@
 
 #ifdef STRUCT_TM_HASZONE
 static void
-init_tm(struct tm *ptm)		/* see mktime, strftime and asctime	*/
+classdate_init_tm(struct tm *ptm)		/* see mktime, strftime and asctime	*/
 {
     Time_t now;
     (void)time(&now);
@@ -48,15 +48,15 @@ init_tm(struct tm *ptm)		/* see mktime, strftime and asctime	*/
 }
 
 #else
-# define init_tm(ptm)
+# define classdate_init_tm(ptm)
 #endif
 
 /*
- * mini_mktime - normalise struct tm values without the localtime()
+ * classdate_mini_mktime - normalise struct tm values without the localtime()
  * semantics (and overhead) of mktime().
  */
 static void
-mini_mktime(struct tm *ptm)
+classdate_mini_mktime(struct tm *ptm)
 {
     int yearday;
     int secs;
@@ -250,7 +250,7 @@ mini_mktime(struct tm *ptm)
 
 MODULE = Class::Date	PACKAGE = Class::Date
 
-char *
+void
 strftime_xs(fmt, sec, min, hour, mday, mon, year, wday = -1, yday = -1, isdst = -1)
 	char *		fmt
 	int		sec
@@ -262,12 +262,12 @@ strftime_xs(fmt, sec, min, hour, mday, mon, year, wday = -1, yday = -1, isdst = 
 	int		wday
 	int		yday
 	int		isdst
-    CODE:
+    PPCODE:
 	{
 	    char tmpbuf[128];
 	    struct tm mytm;
 	    int len;
-	    init_tm(&mytm);	/* XXX workaround - see init_tm() above */
+	    classdate_init_tm(&mytm);	/* XXX workaround - see classdate_init_tm() above */
 	    mytm.tm_sec = sec;
 	    mytm.tm_min = min;
 	    mytm.tm_hour = hour;
@@ -277,7 +277,7 @@ strftime_xs(fmt, sec, min, hour, mday, mon, year, wday = -1, yday = -1, isdst = 
 	    mytm.tm_wday = wday;
 	    mytm.tm_yday = yday;
 	    mytm.tm_isdst = isdst;
-	    mini_mktime(&mytm);
+	    classdate_mini_mktime(&mytm);
 	    len = strftime(tmpbuf, sizeof tmpbuf, fmt, &mytm);
 	    /*
 	    ** The following is needed to handle to the situation where 
@@ -324,3 +324,4 @@ strftime_xs(fmt, sec, min, hour, mday, mon, year, wday = -1, yday = -1, isdst = 
 		    ST(0) = sv_2mortal(newSVpv(tmpbuf, len));
 	    }
 	}
+	XSRETURN(1);

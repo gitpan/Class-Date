@@ -11,7 +11,7 @@ BEGIN {
     }
 }
 
-# $Id: Date.pm,v 1.2 2001/10/11 10:45:18 dlux Exp $
+# $Id: Date.pm,v 1.3 2001/10/11 12:35:49 dlux Exp $
 
 require 5.005;
 
@@ -53,7 +53,7 @@ BEGIN {
 
 }
 
-$VERSION = '1.0.6';
+$VERSION = '1.0.7';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -1196,19 +1196,23 @@ object and every operation with this object returns undef or 0.
 
 =head1 DEVELOPMENT FOCUS
 
-The first goal when I have developed this module is to make this module very 
-easy to use.
+For 1.0.x, the first goal is to fix the upcoming bugs and for make it work
+in more and more platform.
 
-The second most important goal was to make it full-featured.
+For later releases (2.0), I plan a major rewrite, which will keep only the
+user interface, but can be used with several existing backends for date
+calculation, formatting and date parsing. Some kind of plugins system can keep
+this module as is: a 'general date and time type' for perl. With the plugin
+system, a user have more control over speed, memory usage and environmental
+restrictions.
 
-The third most important goal was to make it work everywhere. The only issue
-with this was the 'strftime("%s")' problem, I hope it has been solved.
+E.g. Someone, who doesn't want to use the huge POSIX module, can use the
+internal strftime function, who doesn't want to use (or cannot use) a 
+C compiler in a specific environment, can use it from the POSIX module. 
 
-The fourth most important goal was to make it use as low memory as possible.
-It is an issue if someone runs this module under mod_perl.
-
-Speed was not an issue until 1.0, because people usually do not need to do
-tons of date manipulations in a short time. 
+If someone wants to use Date::Calc as a date manipulation backend, because it
+is much faster than the localtime() / gmtime() based internal routines, and
+this module is available, then he can use it.
 
 =head1 SPEED ISSUES
 
@@ -1252,6 +1256,32 @@ field.
 
 =back
 
+=head1 SUPPORT
+
+Class::Date is free software. IT COMES WITHOUT WARRANTY OF ANY KIND.
+
+If you have questions, you can send it to the Class::Date mailing list:
+
+  class-date@lists.dlux.hu
+  
+You can subscribe to this list by a web-interface:
+
+  http://lists.dlux.hu/wws/info/class-date
+
+=head1 WIN32 notes
+
+Class::Date works in win32 with no known problems. You can acquire and compile
+yourself from source or you can get the binary from the Chris Winters' .ppd
+repository with the following commands:
+
+  c:\> ppm
+  PPM> set repository oi http://openinteract.sourceforge.net/ppmpackages/
+  PPM> set save
+  PPM> install Class-Date
+
+The first two steps in PPM only need to be done at the first time. Next time you
+just run the 'install'.
+
 =head1 COPYRIGHT
 
 Copyright (c) 2001 Szabó, Balázs (dLux)
@@ -1259,11 +1289,11 @@ Copyright (c) 2001 Szabó, Balázs (dLux)
 All rights reserved. This program is free software; you can redistribute it 
 and/or modify it under the same terms as Perl itself.
 
-Portions Copiright (c) Matt Sergeant
+Portions Copyright (c) Matt Sergeant
 
 =head1 AUTHOR
 
-  dLux (Szabó, Balázs) <dlux@kapu.hu>
+  dLux (Szabó, Balázs) <dlux@dlux.hu>
 
 =head1 CREDITS
 
