@@ -33,7 +33,7 @@ BEGIN {
     @EXPORT_OK = (qw( date localdate gmdate now @ERROR_MESSAGES), 
         @{$EXPORT_TAGS{errors}});
 
-    $VERSION = '1.1.3';
+    $VERSION = '1.1.5';
     eval { Class::Date->bootstrap($VERSION); };
     if ($@) {
         warn "Cannot find the XS part of Class::Date, \n".
@@ -43,18 +43,6 @@ BEGIN {
         *strftime_xs = *POSIX::strftime;
         *tzset_xs = *POSIX::tzset;
         *tzname_xs = *POSIX::tzname;
-    }
-
-    # test if the strftime is buggy
-    local $ENV{LC_ALL} = "C";
-    local $ENV{TZ} = "CET";
-    tzset_xs();
-    if (strftime_xs("%Z",localtime(1020463262)) ne "CEST") {
-        die "You are using a buggy implementation of strftime,\n".
-            "Class::Date is refused to work with it.\n".
-            "If you use the POSIX module for strftime, then try to use the\n".
-            "version, which is provided with Class::Date.\n".
-            "If you still encounter this error, contact the author.\n"
     }
 }
 
@@ -220,12 +208,14 @@ sub new_from_scalar_date_parse { my ($s,$date,$tz)=@_;
     local $ENV{TZ} = $zone;
     # local $ENV{LC_ALL} = "C";
     tzset_xs();
-    $ss     = ($lt ||= [ localtime() ])->[0]  if !defined $ss;
-    $mm     = ($lt ||= [ localtime() ])->[1]  if !defined $mm;
-    $hh     = ($lt ||= [ localtime() ])->[2]  if !defined $hh;
-    $day    = ($lt ||= [ localtime() ])->[3] if !defined $day;
-    $month  = ($lt ||= [ localtime() ])->[4] if !defined $month;
-    $year   = ($lt ||= [ localtime() ])->[5] if !defined $year;
+    my $timecalc = $zone eq $GMT_TIMEZONE ?
+        \&gmtime : \&localtime;
+    $ss     = ($lt ||= [ $timecalc->() ])->[0]  if !defined $ss;
+    $mm     = ($lt ||= [ $timecalc->() ])->[1]  if !defined $mm;
+    $hh     = ($lt ||= [ $timecalc->() ])->[2]  if !defined $hh;
+    $day    = ($lt ||= [ $timecalc->() ])->[3] if !defined $day;
+    $month  = ($lt ||= [ $timecalc->() ])->[4] if !defined $month;
+    $year   = ($lt ||= [ $timecalc->() ])->[5] if !defined $year;
     return $s->new_from_array( [$year+1900, $month+1, $day, 
         $hh, $mm, $ss], $zone);
 }
@@ -246,7 +236,9 @@ sub _recalc_from_struct {
         local $ENV{TZ} = $s->[c_tz];
         # local $ENV{LC_ALL} = "C";
         tzset_xs();
-        $s->[c_epoch] = timelocal(@{$s}[c_sec,c_min,c_hour,c_day,c_mon], 
+        my $timecalc = $s->[c_tz] eq $GMT_TIMEZONE ?
+            \&timegm : \&timelocal;
+        $s->[c_epoch] = $timecalc->(@{$s}[c_sec,c_min,c_hour,c_day,c_mon], 
                 $s->[c_year] + 1900);
     };
     return $s->_set_invalid(E_INVALID,$@) if $@;
@@ -261,7 +253,10 @@ sub _recalc_from_epoch { my ($s) = @_;
     local $ENV{TZ} = $s->[c_tz];
     # local $ENV{LC_ALL} = "C";
     tzset_xs();
-    @{$s}[c_year..c_isdst] = (localtime($s->[c_epoch]))[5,4,3,2,1,0,6,7,8];
+    @{$s}[c_year..c_isdst] = 
+        ($s->[c_tz] eq $GMT_TIMEZONE ?
+            gmtime($s->[c_epoch]) : localtime($s->[c_epoch]))
+            [5,4,3,2,1,0,6,7,8];
 }
 
 my $SETHASH = {

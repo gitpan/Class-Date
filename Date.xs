@@ -276,7 +276,7 @@ strftime_xs(fmt, sec, min, hour, mday, mon, year, wday = -1, yday = -1, isdst = 
 	    char tmpbuf[128];
 	    struct tm mytm;
 	    int len;
-	    bzero(&mytm, sizeof(mytm));
+	    memset(&mytm, 0, sizeof(mytm));
 	    mytm.tm_sec = sec;
 	    mytm.tm_min = min;
 	    mytm.tm_hour = hour;

@@ -1,5 +1,12 @@
 Revision history for Perl extension Class::Date.
 
+1.1.5   Wed Feb  5 23:17:50 CET 2003
+	- Small documentation fix
+
+1.1.4   Wed Feb  5 11:15:20 CET 2003 (test release)
+	- Restored the usage of gmtime and timegm methods, because I cannot
+	  solve the timezone issues on win32 platform.
+
 1.1.3   Fri Jan  3 09:07:01 CET 2003
 	- Fixed a warning in the strftime method
 

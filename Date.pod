@@ -562,7 +562,8 @@ XS part from your perl program:
 
 =head1 TIMEZONE SUPPORT
 
-Since 1.0.11, Class::Date handle timezones natively.
+Since 1.0.11, Class::Date handle timezones natively on most platforms (see
+the BUGS AND LIMITATIONS section for more info).
 
 When the module is loaded, then it determines the local base timezone by
 calling the Class::Date::local_timezone() function, and stores these values
@@ -643,6 +644,18 @@ Date::Calc module instead.
 
 =item *
 
+I cannot manage to get the timezone code working properly on ActivePerl
+5.8.0 on win XP and earlier versions possibly have this problem also. If
+you have a system like this, then you will have only two timezones, the
+local and the GMT. Every timezone, which is not equal to
+$Class::Date::GMT_TIMEZONE is assumed to be local. This seems to be caused
+by the win32 implementation of timezone routines. I don't really know how
+to make this thing working, so I gave up this issue. If anyone know a
+working solution, then I will integrate it into Class::Date, but until
+then, the timezone support will not be available for these platforms.
+
+=item *
+
 Perl 5.8.0 and earlier versions has a bug in the strftime code on some
 operating systems (for example Linux), which is timezone related. I
 recommend using the strftime, which is provided with Class::Date, so don't
@@ -698,20 +711,24 @@ You can subscribe to this list by a web-interface:
 
 =head1 WIN32 notes
 
-Class::Date 1.1.0 unfortunately does not work on win32 platform. There are
-some issues with it and I currently don't know how to solve it.
+You can get a binary win32 version of Class::Date from Chris Winters' .ppd
+repository with the following commands:
 
-Class::Date 1.0.10 or earlier works in win32 with no known problems. You
-can acquire and compile yourself from source or you can get the binary from
-the Chris Winters' .ppd repository with the following commands:
+For people using PPM2:
 
   c:\> ppm
   PPM> set repository oi http://openinteract.sourceforge.net/ppmpackages/
   PPM> set save
   PPM> install Class-Date
 
-The first two steps in PPM only need to be done at the first time. Next
-time you just run the 'install'.
+For people using PPM3:
+
+  c:\> ppm
+  PPM> repository http://openinteract.sourceforge.net/ppmpackages/
+  PPM> install Class-Date
+
+The first steps in PPM only needs to be done at the first time. Next time
+you just run the 'install'.
 
 =head1 COPYRIGHT
 
