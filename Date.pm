@@ -1,6 +1,8 @@
 package Class::Date;
 
-# $Id: Date.pm,v 1.6 2001/04/18 18:34:17 dlux Exp $
+# $Id: Date.pm,v 1.7 2001/04/23 16:33:58 dlux Exp $
+
+require 5.005;
 
 use strict;
 use vars qw(
@@ -14,10 +16,10 @@ use DynaLoader;
 
 BEGIN { 
   @ISA=qw(Exporter DynaLoader);
-  @EXPORT_OK = qw( date localdate gmdate cs_mon cs_sec ) 
+  @EXPORT_OK = qw( date localdate gmdate cs_mon cs_sec now ) 
 }
 
-$VERSION = '0.93';
+$VERSION = '0.94';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -56,6 +58,8 @@ use overload
 sub date ($;$) { my ($date,$isgmt)=@_;
   return __PACKAGE__ -> new($date,$isgmt);
 }
+
+sub now () { date(time); }
 
 sub localdate ($) { date($_[0] || time,0) }
 
@@ -291,8 +295,10 @@ sub subtract { my ($s,$rhs)=@_;
     my $dst_adjust = 0;
     $dst_adjust = 60*60*( $s->[c_isdst]-$rhs->[c_isdst] ) if $DST_ADJUST;
     return $s->ClassDateRel->new($s->[c_epoch]-$rhs->[c_epoch]+$dst_adjust);
-  } elsif ($rhs) {
+  } elsif (isa(ref($rhs), "Class::Date::Rel")) {
     return $s->add(-$rhs);
+  } elsif ($rhs) {
+    return $s->add($s->ClassDateRel->new($rhs)->neg);
   } else {
     return $s;
   }
@@ -501,7 +507,7 @@ Class::Date - Class for easy date and time manipulation
 
 =head1 SYNOPSIS
 
-  use Class::Date qw(date localdate gmdate);
+  use Class::Date qw(date localdate gmdate now);
   
   # creating absolute date object (local time)
   $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];
@@ -511,6 +517,7 @@ Class::Date - Class for easy date and time manipulation
     hour => $hour, min => $min, sec => $sec };
   $date = date "2001-11-12 07:13:12";
   $date = localdate "2001-12-11";
+  $date = now;             #  the same as date(time)
   ...
 
   # creating absolute date object (GMT)
@@ -874,11 +881,24 @@ version 1.0 if no bugs can be found in that period.
 
 =head1 BUGS
 
+=over 4
+
+=item *
+
 This module uses the POSIX functions for date and time calculations, so
 it is not working for dates beyond 2038 and before 1902. I hope that someone 
 will fix this with new time_t in libc. If you really need dates over 2038, 
 you need to completely rewrite this module or use Date::Calc or other date 
 modules.
+
+=item *
+
+This version of the module is known not to work in Win32 and Solaris (and
+possibly other platforms), because strftime on these platform does not 
+have a "%s" macro. However this module is reported (by the CPAN::Testers) to
+work on FreeBSD and Linux.
+
+=back
 
 =head1 COPYRIGHT
 
@@ -895,10 +915,11 @@ Portions Copiright (c) Matt Sergeant
 
 =head1 CREDITS
 
-  Lots of code are borrowed from the Time::Object module by 
-    Matt Sergeant <matt@sergeant.org>
+  - Matt Sergeant <matt@sergeant.org>
+    (Lots of code are borrowed from the Time::Object module)
+  - Tatsuhiko Miyagawa <miyagawa@edge.co.jp> (bugfixes)
 
 =head1 SEE ALSO
 
-perl, Time::Object, Date::Calc.
+perl, Date::Calc, Time::Object.
 

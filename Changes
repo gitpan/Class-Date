@@ -1,5 +1,9 @@
 Revision history for Perl extension Class::Date.
 
+0.94    Thu Apr 26 16:30:39 CEST 2001
+	- $date-'1D' bug fixed
+	- added "now" function
+
 0.93    Wed Apr 18 12:55:15 CEST 2001
 	- the return value from Date::Parse is fixed
 

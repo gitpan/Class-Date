@@ -1,7 +1,7 @@
 use Test;
 use strict;
 BEGIN { 
-  plan tests => 56;
+  plan tests => 58;
 };
 use Class::Date qw(localdate date);
 
@@ -87,6 +87,8 @@ ok $date1+"2-0-0","2002-11-11 00:01:02";
 ok $date1-$reldate1,"2000-11-10 00:01:02";
 ok $date7-$reldate3+$reldate3,$date7;
 ok $date3-$date1,'120D 12h 12m 53s';
+ok $date1-'1D',"2000-11-10 0:1:2";
+ok $date1-[0,0,1],"2000-11-10 0:1:2";
 
 # Class::Date Comparison
 

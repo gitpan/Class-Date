@@ -2,7 +2,7 @@ NAME
     Class::Date - Class for easy date and time manipulation
 
 SYNOPSIS
-      use Class::Date qw(date localdate gmdate);
+      use Class::Date qw(date localdate gmdate now);
   
       # creating absolute date object (local time)
       $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];
@@ -12,6 +12,7 @@ SYNOPSIS
         hour => $hour, min => $min, sec => $sec };
       $date = date "2001-11-12 07:13:12";
       $date = localdate "2001-12-11";
+      $date = now;             #  the same as date(time)
       ...
 
       # creating absolute date object (GMT)
@@ -349,11 +350,16 @@ INTERNALS
     bugs can be found in that period.
 
 BUGS
-    This module uses the POSIX functions for date and time calculations, so
-    it is not working for dates beyond 2038 and before 1902. I hope that
-    someone will fix this with new time_t in libc. If you really need dates
-    over 2038, you need to completely rewrite this module or use Date::Calc
-    or other date modules.
+    *   This module uses the POSIX functions for date and time calculations,
+        so it is not working for dates beyond 2038 and before 1902. I hope
+        that someone will fix this with new time_t in libc. If you really
+        need dates over 2038, you need to completely rewrite this module or
+        use Date::Calc or other date modules.
+
+    *   This version of the module is known not to work in Win32 and Solaris
+        (and possibly other platforms), because strftime on these platform
+        does not have a "%s" macro. However this module is reported (by the
+        CPAN::Testers) to work on FreeBSD and Linux.
 
 COPYRIGHT
     Copyright (c) 2001 Szabó, Balázs (dLux)
@@ -367,9 +373,10 @@ AUTHOR
       dLux (Szabó, Balázs) <dlux@kapu.hu>
 
 CREDITS
-      Lots of code are borrowed from the Time::Object module by 
-        Matt Sergeant <matt@sergeant.org>
+      - Matt Sergeant <matt@sergeant.org>
+        (Lots of code are borrowed from the Time::Object module)
+      - Tatsuhiko Miyagawa <miyagawa@edge.co.jp> (bugfixes)
 
 SEE ALSO
-    perl, Time::Object, Date::Calc.
+    perl, Date::Calc, Time::Object.
 
