@@ -1,5 +1,9 @@
 Revision history for Perl extension Class::Date.
 
+1.1.6   Sun Mar 16 18:05:23 CET 2003
+	- Introducing the NOTZ_TIMEZONE variable to support local time
+	  calculations, where TZ variables are not set.
+
 1.1.5   Wed Feb  5 23:17:50 CET 2003
 	- Small documentation fix
 

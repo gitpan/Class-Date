@@ -9,6 +9,7 @@ use vars qw(
   $DATE_FORMAT $DST_ADJUST $MONTH_BORDER_ADJUST $RANGE_CHECK
   @NEW_FROM_SCALAR @ERROR_MESSAGES $WARNINGS 
   $DEFAULT_TIMEZONE $LOCAL_TIMEZONE $GMT_TIMEZONE
+  $NOTZ_TIMEZONE $RESTORE_TZ
 );
 use Carp;
 use UNIVERSAL qw(isa);
@@ -33,7 +34,7 @@ BEGIN {
     @EXPORT_OK = (qw( date localdate gmdate now @ERROR_MESSAGES), 
         @{$EXPORT_TAGS{errors}});
 
-    $VERSION = '1.1.5';
+    $VERSION = '1.1.6';
     eval { Class::Date->bootstrap($VERSION); };
     if ($@) {
         warn "Cannot find the XS part of Class::Date, \n".
@@ -46,13 +47,42 @@ BEGIN {
     }
 }
 
-$LOCAL_TIMEZONE = $DEFAULT_TIMEZONE = local_timezone();
 $GMT_TIMEZONE = 'GMT';
-
 $DST_ADJUST = 1;
 $MONTH_BORDER_ADJUST = 0;
 $RANGE_CHECK = 0;
+$RESTORE_TZ = 1;
 $DATE_FORMAT="%Y-%m-%d %H:%M:%S";
+
+sub _set_tz { my ($tz) = @_;
+    my $lasttz = $ENV{TZ};
+    if (!defined $tz || $tz eq $NOTZ_TIMEZONE) {
+        # warn "_set_tz: deleting TZ\n";
+        delete $ENV{TZ}
+    } else {
+        # warn "_set_tz: setting TZ to $tz\n";
+        $ENV{TZ} = $tz;
+    }
+    tzset_xs();
+    return $lasttz;
+}
+
+sub _set_temp_tz { my ($tz, $sub) = @_;
+    my $lasttz = _set_tz($tz);
+    my $retval = eval { $sub->(); };
+    _set_tz($lasttz) if $RESTORE_TZ;
+    die $@ if $@;
+    return $retval;
+}
+
+tzset_xs();
+$LOCAL_TIMEZONE = $DEFAULT_TIMEZONE = local_timezone();
+{
+    my $last_tz = _set_tz(undef);
+    $NOTZ_TIMEZONE = local_timezone();
+    _set_tz($last_tz);
+}
+# warn "LOCAL: $LOCAL_TIMEZONE, NOTZ: $NOTZ_TIMEZONE\n";
 
 # this method is used to determine what is the package name of the relative
 # time class. It is used at the operators. You only need to redefine it if
@@ -205,17 +235,17 @@ sub new_from_scalar_date_parse { my ($s,$date,$tz)=@_;
     my ($ss, $mm, $hh, $day, $month, $year, $zone) =
         Date::Parse::strptime($date);
     $zone = $tz if !defined $zone;
-    local $ENV{TZ} = $zone;
-    # local $ENV{LC_ALL} = "C";
-    tzset_xs();
-    my $timecalc = $zone eq $GMT_TIMEZONE ?
-        \&gmtime : \&localtime;
-    $ss     = ($lt ||= [ $timecalc->() ])->[0]  if !defined $ss;
-    $mm     = ($lt ||= [ $timecalc->() ])->[1]  if !defined $mm;
-    $hh     = ($lt ||= [ $timecalc->() ])->[2]  if !defined $hh;
-    $day    = ($lt ||= [ $timecalc->() ])->[3] if !defined $day;
-    $month  = ($lt ||= [ $timecalc->() ])->[4] if !defined $month;
-    $year   = ($lt ||= [ $timecalc->() ])->[5] if !defined $year;
+    my $timecalc = 
+        $zone eq $GMT_TIMEZONE ?
+            \&gmtime : \&localtime;
+    _set_temp_tz($zone, sub {
+        $ss     = ($lt ||= [ $timecalc->() ])->[0]  if !defined $ss;
+        $mm     = ($lt ||= [ $timecalc->() ])->[1]  if !defined $mm;
+        $hh     = ($lt ||= [ $timecalc->() ])->[2]  if !defined $hh;
+        $day    = ($lt ||= [ $timecalc->() ])->[3] if !defined $day;
+        $month  = ($lt ||= [ $timecalc->() ])->[4] if !defined $month;
+        $year   = ($lt ||= [ $timecalc->() ])->[5] if !defined $year;
+    });
     return $s->new_from_array( [$year+1900, $month+1, $day, 
         $hh, $mm, $ss], $zone);
 }
@@ -233,13 +263,15 @@ sub _recalc_from_struct {
     $s->[c_epoch] = 0; # these are required to suppress warinngs;
     eval {
         local $SIG{__WARN__} = sub { };
-        local $ENV{TZ} = $s->[c_tz];
-        # local $ENV{LC_ALL} = "C";
-        tzset_xs();
         my $timecalc = $s->[c_tz] eq $GMT_TIMEZONE ?
             \&timegm : \&timelocal;
-        $s->[c_epoch] = $timecalc->(@{$s}[c_sec,c_min,c_hour,c_day,c_mon], 
-                $s->[c_year] + 1900);
+        _set_temp_tz($s->[c_tz],
+            sub {
+                $s->[c_epoch] = $timecalc->(
+                    @{$s}[c_sec,c_min,c_hour,c_day,c_mon], 
+                    $s->[c_year] + 1900);
+            }
+        );
     };
     return $s->_set_invalid(E_INVALID,$@) if $@;
     my $sum = $s->_check_sum;
@@ -250,13 +282,14 @@ sub _recalc_from_struct {
 }
 
 sub _recalc_from_epoch { my ($s) = @_;
-    local $ENV{TZ} = $s->[c_tz];
-    # local $ENV{LC_ALL} = "C";
-    tzset_xs();
-    @{$s}[c_year..c_isdst] = 
-        ($s->[c_tz] eq $GMT_TIMEZONE ?
-            gmtime($s->[c_epoch]) : localtime($s->[c_epoch]))
-            [5,4,3,2,1,0,6,7,8];
+    _set_temp_tz($s->[c_tz],
+        sub {
+            @{$s}[c_year..c_isdst] = 
+                ($s->[c_tz] eq $GMT_TIMEZONE ?
+                    gmtime($s->[c_epoch]) : localtime($s->[c_epoch]))
+                    [5,4,3,2,1,0,6,7,8];
+        }
+    )
 }
 
 my $SETHASH = {
@@ -389,23 +422,24 @@ sub hash { return %{ shift->href } }
 # Thanks to Tony Olekshy <olekshy@cs.ualberta.ca> for this algorithm
 # ripped from Time::Object by Matt Sergeant
 sub tzoffset { my ($s)=@_;
-  my $epoch = $s->[c_epoch];
-  my $j = sub { # Tweaked Julian day number algorithm.
-    my ($s,$n,$h,$d,$m,$y) = @_; $m += 1; $y += 1900;
-    # Standard Julian day number algorithm without constant.
-    my $y1 = $m > 2 ? $y : $y - 1;
-    my $m1 = $m > 2 ? $m + 1 : $m + 13;
-    my $day = int(365.25 * $y1) + int(30.6001 * $m1) + $d;
-    # Modify to include hours/mins/secs in floating portion.
-    return $day + ($h + ($n + $s / 60) / 60) / 24;
-  };
-  local $ENV{TZ} = $s->[c_tz];
-  # local $ENV{LC_ALL} = "C";
-  tzset_xs();
-  # Compute floating offset in hours.
-  my $delta = 24 * (&$j(localtime $epoch) - &$j(gmtime $epoch));
-  # Return value in seconds rounded to nearest minute.
-  return int($delta * 60 + ($delta >= 0 ? 0.5 : -0.5)) * 60;
+    my $epoch = $s->[c_epoch];
+    my $j = sub { # Tweaked Julian day number algorithm.
+        my ($s,$n,$h,$d,$m,$y) = @_; $m += 1; $y += 1900;
+        # Standard Julian day number algorithm without constant.
+        my $y1 = $m > 2 ? $y : $y - 1;
+        my $m1 = $m > 2 ? $m + 1 : $m + 13;
+        my $day = int(365.25 * $y1) + int(30.6001 * $m1) + $d;
+        # Modify to include hours/mins/secs in floating portion.
+        return $day + ($h + ($n + $s / 60) / 60) / 24;
+    };
+    # Compute floating offset in hours.
+    my $delta = _set_temp_tz($s->[c_tz],
+        sub {
+            24 * (&$j(localtime $epoch) - &$j(gmtime $epoch));
+        }
+    );
+    # Return value in seconds rounded to nearest minute.
+    return int($delta * 60 + ($delta >= 0 ? 0.5 : -0.5)) * 60;
 }
 
 sub month_begin { my ($s) = @_;
@@ -432,10 +466,7 @@ sub is_leap_year { my ($s) = @_;
 
 sub strftime { my ($s,$format)=@_;
   $format ||= "%a, %d %b %Y %H:%M:%S %Z";
-  local $ENV{TZ} = $s->[c_tz];
-  # local $ENV{LC_ALL} = "C";
-  tzset_xs();
-  my $fmt = strftime_xs($format,$s->struct);
+  my $fmt = _set_temp_tz($s->[c_tz], sub { strftime_xs($format,$s->struct) } );
   return $fmt;
 }
 
@@ -518,7 +549,6 @@ sub compare {
 }
 
 sub local_timezone {
-    tzset_xs();
     return (tzname_xs())[0];
 }
 

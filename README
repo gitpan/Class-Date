@@ -546,6 +546,21 @@ TIMEZONE SUPPORT
     Linux systems, you can see the possible base timezones in the
     /usr/share/zoneinfo directory.
 
+    In Class::Date 1.1.6, a new environment variable is introduced:
+    $Class::Date::NOTZ_TIMEZONE. This variable stores the local timezone,
+    which is used, when the TZ environment variable is not set. It is
+    introduced, because there are some systems, which cannot handle the
+    queried timezone well. For example the local timezone is CST, it is
+    returned by the tzname() perl function, but when I set the TZ
+    environment variable to CST, it works like it would be GMT. The
+    workaround is NOTZ_TIMEZONE: if a date object has a timezone, which is
+    the same as NOTZ_TIMEZONE, then the TZ variable will be removed before
+    each calculation. In normal case, it would be the same as setting TZ to
+    $NOTZ_TIMEZONE, but some systems don't like it, so I decided to
+    introduce this variable. The $Class::Date::NOTZ_TIMEZONE variable is set
+    in the initialization of the module by removing the TZ variable from the
+    environment and querying the tzname variable.
+
 INTERNALS
     This module uses operator overloading very heavily. I've found it quite
     stable, but I am afraid of it a bit.
