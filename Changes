@@ -1,5 +1,10 @@
 Revision history for Perl extension Class::Date.
 
+1.0.2   Wed Jun 27 00:08:05 CEST 2001
+	- "set" method is renamed to "clone"
+	- named interface is documented
+	- minor documentation fixes
+
 1.0.1   Sat Jun 16 16:14:02 CEST 2001
 	- added a "set" method to change parts of the date
 	- fix the "href" method

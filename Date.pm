@@ -1,7 +1,7 @@
 package Class::Date;
 use Time::Local qw(timegm timelocal);
 
-# $Id: Date.pm,v 1.16 2001/06/12 07:43:52 dlux Exp $
+# $Id: Date.pm,v 1.17 2001/06/18 09:44:34 dlux Exp $
 
 require 5.005;
 
@@ -30,7 +30,7 @@ BEGIN {
     }
 }
 
-$VERSION = '1.0.1';
+$VERSION = '1.0.2';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -248,7 +248,7 @@ $SETHASH->{mday}   = $SETHASH->{day_of_month} = $SETHASH->{day};
 $SETHASH->{minute} = $SETHASH->{min};
 $SETHASH->{second} = $SETHASH->{sec};
 
-sub set {
+sub clone {
     my $s = shift;
     my $new_date = $s->new_copy($s);
     while (@_) {
@@ -259,6 +259,8 @@ sub set {
     $new_date->_recalc_from_struct;
     return $new_date;
 }
+
+*set = *clone; # compatibility
 
 sub year     { shift->[c_year]  +1900 }
 sub _year    { shift->[c_year]  }
@@ -651,12 +653,13 @@ Class::Date - Class for easy date and time manipulation
     hour => $hour, min => $min, sec => $sec };
   $date = date "2001-11-12 07:13:12";
   $date = localdate "2001-12-11";
-  $date = now;             #  the same as date(time)
+  $date = now;                      #  the same as date(time)
+  $date = date($other_date_object); # cloning
   ...
 
   # creating absolute date object (GMT)
   $date = new Class::Date [$year,$month,$day,$hour,$min,$sec],1;
-  $date = gmtime "2001-11-12 17:13";
+  $date = gmdate "2001-11-12 17:13";
   ...
 
   # creating relative date object
@@ -722,18 +725,13 @@ Class::Date - Class for easy date and time manipulation
   %hash=$date->hash;
   # !! $hash{year}: 1900-, $hash{month}: 1-12
 
-  # set part of the date
-  $date->year(2002);
-  $date->_year(102);
-  $date->mon(11);    # 1-12
-  $date->_mon;       # 0-11
-
   $date->month_begin  # First day of the month (date object)
   $date->month_end    # Last day of the month
   $date->days_in_month # 28..31
 
   # constructing new date based on an existing one:
-  $new_date = $date->set( year => 1977, sec => 14 );
+  $new_date = $date->clone;
+  $new_date = $date->clone( year => 1977, sec => 14 );
   # valid keys: year, _year, month, mon, _month, _mon, day, mday, day_of_month,
   #             hour, min, minute, sec, second
 
@@ -813,6 +811,17 @@ Class::Date - Class for easy date and time manipulation
   # Adding / Subtracting months and years are sometimes tricky:
   print date("2001-01-29") + '1M' - '1M'; # gives "2001-02-01"
   print date("2000-02-29") + '1Y' - '1Y'; # gives "2000-03-01"
+
+  # Named interface ($date2 does not necessary to be a Class::Date object)
+  $date1->string;               # same as $date1 in scalar context
+  $date1->subtract($date2);     # same as $date1 - $date2
+  $date1->add($date2);          # same as $date1 + $date2
+  $date1->compare($date2);      # same as $date1 <=> $date2
+
+  $reldate1->sec;               # same as $reldate1 in numeric or scalar context
+  $reldate1->compare($reldate2);# same as $reldate1 <=> $reldate2
+  $reldate1->add($reldate2);    # same as $reldate1 + $reldate2
+  $reldate1->neg                # used for subtraction
 
 =head1 DESCRIPTION
 
@@ -981,15 +990,18 @@ You can chop the time value from this object (set hour, min and sec to 0)
 with the "truncate" or "trunc" method. It does not modify the specified
 object, it returns with a new one.
 
-=item set
+=item clone
 
-You can create new date object based on an existing one, by using the "set"
+You can create new date object based on an existing one, by using the "clone"
 method. Note, this DOES NOT modify the base object.
 
-  $new_date = $date->set( year => 2001, hour => 14 );
+  $new_date = $date->clone( year => 2001, hour => 14 );
 
 The valid keys are: year, _year, month, mon, _month, _mon, day, mday, 
 day_of_month, hour, min, minute, sec, second.
+
+There is a "set" method, which does the same as the "clone", it exists 
+only for compatibility.
 
 =item Operations with Class::Date::Rel
 

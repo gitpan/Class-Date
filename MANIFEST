@@ -9,3 +9,4 @@ t/00_base.t
 t/10_fields.t
 t/20_gmdate.t
 t/30_localdate.t
+t/40_errors.t
