@@ -1,5 +1,11 @@
 Revision history for Perl extension Class::Date.
 
+1.0.8	Wed Nov  7 12:15:28 CET 2001
+	- fix Time::Local detection in perl 5.005_03
+	- The module is now working without a C compiler
+	- You will get warnings if you request for Date::Parse, but it cannot
+	  be found
+
 1.0.7	Mon Oct 15 00:22:47 CEST 2001
 	- fix for function name clash in bleadperl
 	- Documentation update: Win32 and support chapters added,

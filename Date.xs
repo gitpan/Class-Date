@@ -3,7 +3,7 @@
  * This code is completely borrowed from Matt Sergeant's Time::Object with only
  * small modifications
  *
- * $Id: Date.xs,v 1.1.1.1 2001/08/07 15:26:20 dlux Exp $
+ * $Id: Date.xs,v 1.2 2001/10/17 13:08:12 dlux Exp $
  *
  */
 

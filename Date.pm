@@ -1,17 +1,5 @@
 package Class::Date;
-use Time::Local;
-BEGIN {
-    if (exists $Time::Local::{timelocal_nocheck}) {
-        *timelocal = *Time::Local::timelocal_nocheck;
-        *timegm = *Time::Local::timegm_nocheck;
-    } else {
-        *timelocal = *Time::Local::timelocal;
-        *timegm = *Time::Local::timegm;
-        
-    }
-}
-
-# $Id: Date.pm,v 1.3 2001/10/11 12:35:49 dlux Exp $
+# $Id: Date.pm,v 1.4 2001/10/17 13:08:12 dlux Exp $
 
 require 5.005;
 
@@ -19,7 +7,7 @@ use strict;
 use vars qw(
   $VERSION @EXPORT_OK %EXPORT_TAGS @ISA
   $DATE_FORMAT $DST_ADJUST $MONTH_BORDER_ADJUST $RANGE_CHECK
-  @NEW_FROM_SCALAR @ERROR_MESSAGES
+  @NEW_FROM_SCALAR @ERROR_MESSAGES $WARNINGS
 );
 use Carp;
 use UNIVERSAL qw(isa);
@@ -27,7 +15,19 @@ use UNIVERSAL qw(isa);
 use Exporter;
 use DynaLoader;
 
+use Time::Local;
+
 BEGIN { 
+    $WARNINGS = 1 if !defined $WARNINGS;
+    if ($] > 5.006) {
+        *timelocal = *Time::Local::timelocal_nocheck;
+        *timegm = *Time::Local::timegm_nocheck;
+    } else {
+        *timelocal = *Time::Local::timelocal;
+        *timegm = *Time::Local::timegm;
+        
+    }
+
     @ISA=qw(Exporter DynaLoader);
     my @ERRORS = ( 
         E_OK         => '',
@@ -53,8 +53,14 @@ BEGIN {
 
 }
 
-$VERSION = '1.0.7';
-Class::Date->bootstrap($VERSION);
+$VERSION = '1.0.8';
+eval { Class::Date->bootstrap($VERSION); };
+if ($@) {
+    warn "Cannot find the XS part of Class::Date, using strftime from POSIX module.\n"
+        if $WARNINGS;
+    require POSIX;
+    *strftime_xs = *POSIX::strftime;
+}
 
 $DST_ADJUST = 1;
 $MONTH_BORDER_ADJUST = 0;
@@ -114,8 +120,14 @@ sub import {
   my @exported;
   foreach my $symbol (@_) {
     if ($symbol eq '-DateParse') {
-      push @NEW_FROM_SCALAR,\&new_from_scalar_date_parse
-        if !$Class::Date::DateParse++ && eval { require Date::Parse };
+      if (!$Class::Date::DateParse++) {
+        if ( eval { require Date::Parse} ) {
+            push @NEW_FROM_SCALAR,\&new_from_scalar_date_parse;
+        } else {
+            warn "Date::Parse is not available but requested by Class::Date\n" 
+                if $WARNINGS;
+        }
+      }
     } else {
       push @exported,$symbol;
     }
@@ -671,7 +683,7 @@ Class::Date - Class for easy date and time manipulation
 
 =head1 SYNOPSIS
 
-  use Class::Date qw(:errors date localdate gmdate now);
+  use Class::Date qw(:errors date localdate gmdate now -DateParse);
   
   # creating absolute date object (local time)
   $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];
@@ -794,7 +806,7 @@ Class::Date - Class for easy date and time manipulation
   # date range check
   $Class::Date::RANGE_CHECK = 0; # this is the default
   print date("2001-02-31"); # will print 2001-03-03
-  $Class::Date::RANGE_CHECK = 1; # this is the default
+  $Class::Date::RANGE_CHECK = 1;
   print date("2001-02-31"); # will print nothing
 
   # getting values of a relative date object
@@ -850,6 +862,10 @@ Class::Date - Class for easy date and time manipulation
   $reldate1->compare($reldate2);# same as $reldate1 <=> $reldate2
   $reldate1->add($reldate2);    # same as $reldate1 + $reldate2
   $reldate1->neg                # used for subtraction
+
+  # Disabling Class::Date warnings at load time
+  BEGIN { $Class::Date::WARNINGS=0; }
+  use Class::Date;
 
 =head1 DESCRIPTION
 
@@ -910,8 +926,8 @@ A valid 32-bit integer: This is parsed as a unix time.
 
 =item "YYYY-MM-DD hh::mm:ss"
 
-A standard ISO date format. Additional ".fraction" part is ignored, ":ss" 
-can be omitted.
+A standard ISO(-like) date format. Additional ".fraction" part is ignored, 
+":ss" can be omitted.
 
 =item additional input formats
 
@@ -921,7 +937,7 @@ You can specify "-DateParse" as  an import parameter, e.g:
 
 With this, the module will try to load Date::Parse module, and if it find it then all 
 these formats can be used as an input. Please refer to the Date::Parse
-documentation (this part is not tested by the author but is reported to work).
+documentation.
 
 =back
 
@@ -1165,6 +1181,26 @@ When $MONTH_BORDER_ADJUST is true, this result becomes "2001-02-28". So when
 the date overflows, then it returns the last day insted.
 
 Both settings keeps the time information.
+
+=head1 WORKING WITHOUT A C COMPILER
+
+Class::Date can be used without a C compiler since 1.0.8. If you want to do 
+this, you only need to copy the "Date.pm" whereever your perl compiler searches
+for it. You must make a "Class" directory for it before.
+
+In Debian GNU/Linux system (woody) , a good choice can be the following:
+
+  mkdir /usr/local/share/perl/5.6.1/Class
+  cp Date.pm /usr/local/share/perl/5.6.1/Class
+
+And the module will work.
+
+You can use the $WARNINGS switch to switch off the complains about the missing
+XS part from your perl program:
+
+    BEGIN { $Class::Date::WARNINGS=0; }
+    use Class::Date;
+    ...
 
 =head1 INTERNALS
 

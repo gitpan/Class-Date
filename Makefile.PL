@@ -3,8 +3,8 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
     'NAME'		=> 'Class::Date',
-    'VERSION_FROM'	=> 'Date.pm', # finds $VERSION
+    'VERSION_FROM'	=> 'Date.pm',	    # finds $VERSION
     'dist'              => { 
-      PREOP => 'perl -MPod::Text -e "pod2text(q(Date.pm))" > README'
+	PREOP => $^X.' -MPod::Text -e "pod2text(q(Date.pm))" > README'
     }
-);
+)

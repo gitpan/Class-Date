@@ -2,7 +2,7 @@ NAME
     Class::Date - Class for easy date and time manipulation
 
 SYNOPSIS
-      use Class::Date qw(:errors date localdate gmdate now);
+      use Class::Date qw(:errors date localdate gmdate now -DateParse);
   
       # creating absolute date object (local time)
       $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];
@@ -125,7 +125,7 @@ SYNOPSIS
       # date range check
       $Class::Date::RANGE_CHECK = 0; # this is the default
       print date("2001-02-31"); # will print 2001-03-03
-      $Class::Date::RANGE_CHECK = 1; # this is the default
+      $Class::Date::RANGE_CHECK = 1;
       print date("2001-02-31"); # will print nothing
 
       # getting values of a relative date object
@@ -182,6 +182,10 @@ SYNOPSIS
       $reldate1->add($reldate2);    # same as $reldate1 + $reldate2
       $reldate1->neg                # used for subtraction
 
+      # Disabling Class::Date warnings at load time
+      BEGIN { $Class::Date::WARNINGS=0; }
+      use Class::Date;
+
 DESCRIPTION
     This module is intended to provide a general-purpose date and datetime
     type for perl. You have a Class::Date class for absolute date and
@@ -234,8 +238,8 @@ USAGE
         A valid 32-bit integer: This is parsed as a unix time.
 
     "YYYY-MM-DD hh::mm:ss"
-        A standard ISO date format. Additional ".fraction" part is ignored,
-        ":ss" can be omitted.
+        A standard ISO(-like) date format. Additional ".fraction" part is
+        ignored, ":ss" can be omitted.
 
     additional input formats
         You can specify "-DateParse" as an import parameter, e.g:
@@ -244,8 +248,7 @@ USAGE
 
         With this, the module will try to load Date::Parse module, and if it
         find it then all these formats can be used as an input. Please refer
-        to the Date::Parse documentation (this part is not tested by the
-        author but is reported to work).
+        to the Date::Parse documentation.
 
   Operations
 
@@ -465,6 +468,26 @@ MONTH_BORDER_ADJUST
     when the date overflows, then it returns the last day insted.
 
     Both settings keeps the time information.
+
+WORKING WITHOUT A C COMPILER
+    Class::Date can be used without a C compiler since 1.0.8. If you want to
+    do this, you only need to copy the "Date.pm" whereever your perl
+    compiler searches for it. You must make a "Class" directory for it
+    before.
+
+    In Debian GNU/Linux system (woody) , a good choice can be the following:
+
+      mkdir /usr/local/share/perl/5.6.1/Class
+      cp Date.pm /usr/local/share/perl/5.6.1/Class
+
+    And the module will work.
+
+    You can use the $WARNINGS switch to switch off the complains about the
+    missing XS part from your perl program:
+
+        BEGIN { $Class::Date::WARNINGS=0; }
+        use Class::Date;
+        ...
 
 INTERNALS
     This module uses operator overloading very heavily. I've found it quite
