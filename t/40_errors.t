@@ -1,6 +1,6 @@
 use Test;
 use strict;
-BEGIN { plan tests => 17; };
+BEGIN { plan tests => 18; };
 use Class::Date qw(:errors gmdate);
 
 $Class::Date::DST_ADJUST=1;
@@ -39,3 +39,5 @@ ok !$a;
 ok $a->error, E_INVALID;
 ok $a->errstr, "Invalid date or time\n";
 
+$a = gmdate("2001-05-04 07:09:09") + [1,-2,-4];
+ok $a;

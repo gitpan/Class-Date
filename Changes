@@ -1,5 +1,8 @@
 Revision history for Perl extension Class::Date.
 
+1.0.4	Jul 12 11:00:46 CEST 2001
+	- Fix a bug with RANGE_CHECK in addition
+
 1.0.3	Tue Jul  3 13:09:04 CEST 2001
 	- "errmsg" method is not works as expected
 	- "errstr" is now an alias to "errmsg"

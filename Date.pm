@@ -1,7 +1,7 @@
 package Class::Date;
 use Time::Local qw(timegm timelocal);
 
-# $Id: Date.pm,v 1.18 2001/06/29 08:42:44 dlux Exp $
+# $Id: Date.pm,v 1.19 2001/07/04 10:42:59 dlux Exp $
 
 require 5.005;
 
@@ -43,7 +43,7 @@ BEGIN {
 
 }
 
-$VERSION = '1.0.3';
+$VERSION = '1.0.4';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -429,6 +429,7 @@ sub subtract { my ($s,$rhs)=@_;
 }
 
 sub add { my ($s,$rhs)=@_;
+  local $RANGE_CHECK;
   $rhs=$s->ClassDateRel->new($rhs) if !isa($rhs,'Class::Date::Rel');
 	
   return $s if !isa($rhs,'Class::Date::Rel');
