@@ -1,7 +1,7 @@
 /*
  *
- * This code is completely borrowed from Matt Sergeant's Time::Object with only
- * small modifications
+ * Some functions (init_tm, mini_mktime, strftime_xs) are borrowed from 
+ * Matt Sergeant's Time::Object module
  *
  * $Id: Date.xs,v 1.2 2001/10/17 13:08:12 dlux Exp $
  *
@@ -325,3 +325,21 @@ strftime_xs(fmt, sec, min, hour, mday, mon, year, wday = -1, yday = -1, isdst = 
 	    }
 	}
 	XSRETURN(1);
+
+MODULE = Class::Date	PACKAGE = Class::Date
+
+void
+tzset_xs()
+CODE:
+    tzset();
+
+MODULE = Class::Date	PACKAGE = Class::Date
+
+void
+tzname_xs()
+PPCODE:
+    EXTEND(SP,2);
+    PUSHs(sv_2mortal(newSVpv(tzname[0],0)));
+    PUSHs(sv_2mortal(newSVpv(tzname[1],0)));
+    XSRETURN(2);
+

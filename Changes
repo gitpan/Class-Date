@@ -1,5 +1,9 @@
 Revision history for Perl extension Class::Date.
 
+1.1.0   Mon Jul 15 20:24:04 CEST 2002
+	- Date::Parse support now works well with partly defined dates.
+	- Full timezone support (except on the win32 platform)
+
 1.0.10  Sun Mar 10 21:45:58 CET 2002
 	- Extend the range of operation to 1902-2038 where the underlying
 	  system (perl, POSIX functions) support

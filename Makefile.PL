@@ -5,6 +5,6 @@ WriteMakefile(
     'NAME'		=> 'Class::Date',
     'VERSION_FROM'	=> 'Date.pm',	    # finds $VERSION
     'dist'              => { 
-	PREOP => $^X.' -MPod::Text -e "pod2text(q(Date.pm))" > README'
+	PREOP => $^X.' -MPod::Text -e "pod2text(q(Date.pod))" > README'
     }
 )

@@ -1,6 +1,8 @@
 Changes
 Date.pm
+Date.pod
 Date.xs
+Date/Const.pm
 MANIFEST
 MANIFEST.SKIP
 Makefile.PL
