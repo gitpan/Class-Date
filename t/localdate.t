@@ -1,7 +1,7 @@
 use Test;
 use strict;
 BEGIN { 
-  plan tests => 50;
+  plan tests => 56;
 };
 use Class::Date qw(localdate date);
 
@@ -132,3 +132,12 @@ ok $reldate9, "4-0-0 0:0:0";
 
 my $reldate10=Class::Date::Rel->new( { month => 5 });
 ok $reldate10, "0-5-0 0:0:0";
+
+my ($y,$m,$d,$hh,$mm,$ss)=$date1->array;
+ok $y,2000;
+ok $m,11;
+ok $d,11;
+ok $hh,0;
+ok $mm,1;
+ok $ss,2;
+

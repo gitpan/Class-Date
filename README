@@ -2,7 +2,7 @@ NAME
     Class::Date - Class for easy date and time manipulation
 
 SYNOPSIS
-      use Class::Date qw(date localdate gmdate $DATE_FORMAT);
+      use Class::Date qw(date localdate gmdate);
   
       # creating absolute date object (local time)
       $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];

@@ -1,18 +1,23 @@
 package Class::Date;
 
-# $Id: Date.pm,v 1.2 2001/04/05 11:22:24 dlux Exp $
+# $Id: Date.pm,v 1.4 2001/04/09 11:49:59 dlux Exp $
 
 use strict;
 use vars qw(
-  $VERSION @EXPORT_OK $DATE_FORMAT $DST_ADJUST @NEW_FROM_SCALAR
+  $VERSION @EXPORT_OK $DATE_FORMAT $DST_ADJUST @NEW_FROM_SCALAR @ISA
 );
 use Carp;
 use UNIVERSAL qw(isa);
 
-use base qw(Exporter DynaLoader);
-BEGIN { @EXPORT_OK = qw( date localdate gmdate $DATE_FORMAT cs_mon cs_sec ) }
+use Exporter;
+use DynaLoader;
 
-$VERSION = '0.90';
+BEGIN { 
+  @ISA=qw(Exporter DynaLoader);
+  @EXPORT_OK = qw( date localdate gmdate cs_mon cs_sec ) 
+}
+
+$VERSION = '0.91';
 Class::Date->bootstrap($VERSION);
 
 $DST_ADJUST = 1;
@@ -63,6 +68,7 @@ sub new { my ($proto,$time,$isgmt)=@_;
   if (defined($time) && isa(ref($proto), __PACKAGE__ )) {
     $isgmt=$proto->[c_isgmt];
   }
+  return undef if !defined $time;
   if (isa($time, __PACKAGE__ )) {
     return $class->new_copy($time,$isgmt);
   } elsif (isa($time,'Class::Date::Rel')) {
@@ -214,7 +220,12 @@ sub dmy { my ($s)=@_;
   sprintf('%02d/%02d/%04d', $s->[c_day], $s->mon, $s->year)
 }
 
-sub array { return ( @{ shift() }[c_year..c_sec] ) }
+sub array { my ($s)=@_;
+  my @return=@{$s}[c_year..c_sec];
+  $return[c_year]+=1900;
+  $return[c_mon]+=1;
+  @return;
+}
 
 sub aref { return \( shift() -> array() ) }
 *as_array = *aref;
@@ -344,7 +355,7 @@ use constant SEC_PER_MONTH => 2_629_744;
 # see the ClassDateRel const in package Class::Date
 use constant ClassDate => "Class::Date";
 
-BEGIN { Class::Date->import qw(cs_mon cs_sec) };
+BEGIN { Class::Date->import(qw(cs_mon cs_sec)) };
 
 use overload 
   '0+'  => "sec",
@@ -357,6 +368,7 @@ use overload
                 
 sub new { my ($proto,$val)=@_;
   my $class = ref($proto) || $proto;
+  return undef if !defined $val;
   if (isa(ref($val), __PACKAGE__ )) {
     return $class->new_copy($val);
   } elsif (ref($val) eq 'ARRAY') {
@@ -480,7 +492,7 @@ Class::Date - Class for easy date and time manipulation
 
 =head1 SYNOPSIS
 
-  use Class::Date qw(date localdate gmdate $DATE_FORMAT);
+  use Class::Date qw(date localdate gmdate);
   
   # creating absolute date object (local time)
   $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];
