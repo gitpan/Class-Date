@@ -12,3 +12,4 @@ t/10_fields.t
 t/20_gmdate.t
 t/30_localdate.t
 t/40_errors.t
+META.yml                                 Module meta-data (added by MakeMaker)

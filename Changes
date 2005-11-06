@@ -1,5 +1,9 @@
 Revision history for Perl extension Class::Date.
 
+1.1.8	Sun Nov  6 16:36:54 CET 2005
+	- Added Env::C support for mod_perl environments
+	- Added documentation about thread-safety and mod_perl issues
+
 1.1.7   Wed Aug 20 23:16:29 CEST 2003
 	- Bugfix in Date::Parse support
 

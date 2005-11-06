@@ -2,7 +2,7 @@ NAME
     Class::Date - Class for easy date and time manipulation
 
 SYNOPSIS
-      use Class::Date qw(:errors date localdate gmdate now -DateParse);
+      use Class::Date qw(:errors date localdate gmdate now -DateParse -EnvC);
   
       # creating absolute date object (local time)
       $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];
@@ -614,7 +614,27 @@ SPEED ISSUES
     development is not the speed in 1.0. For fast date and datetime
     calculations, use Date::Calc module instead.
 
-BUGS AND LIMITATIONS
+THREAD SAFETY and MOD_PERL
+    This module is NOT thread-safe, since it uses C library functions, which
+    are not thread-safe. Using this module in a multi-threaded environment
+    can cause timezones to be messed up. I did not put any warning about it,
+    you have to make sure that you understand this!
+
+    Under some circumstances in a mod_perl environment, you require the
+    Env::C module to set the TZ variable properly before calling the time
+    functions. I added the -EnvC import option to automatically load this
+    module if it is not loaded already. Please read the mod_perl
+    documentation about the environment variables and mod_perl to get the
+    idea why it is required sometimes:
+
+      http://perl.apache.org/docs/2.0/user/troubleshooting/troubleshooting.html#C_Libraries_Don_t_See_C__ENV__Entries_Set_by_Perl_Code
+
+    You are sure have this problem if the $Class::Date::NOTZ_TIMEZONE
+    variable is set to 'UTC', althought you are sure that your timezone is
+    not that. Try -EnvC in this case, but make sure that you are not using
+    it in a multi-threaded environment!
+
+OTHER BUGS AND LIMITATIONS
     *   I cannot manage to get the timezone code working properly on
         ActivePerl 5.8.0 on win XP and earlier versions possibly have this
         problem also. If you have a system like this, then you will have
@@ -666,13 +686,9 @@ BUGS AND LIMITATIONS
 SUPPORT
     Class::Date is free software. IT COMES WITHOUT WARRANTY OF ANY KIND.
 
-    If you have questions, you can send it to the Class::Date mailing list:
+    If you have questions, you can send questions directly to me:
 
-      class-date@lists.dlux.hu
-  
-    You can subscribe to this list by a web-interface:
-
-      http://lists.dlux.hu/wws/info/class-date
+      dlux@dlux.hu
 
 WIN32 notes
     You can get a binary win32 version of Class::Date from Chris Winters'

@@ -1,5 +1,5 @@
 package Class::Date;
-# $Id: Date.pm 58 2003-08-16 12:41:29Z dlux $
+# $Id: Date.pm 59 2003-08-20 21:19:06Z dlux $
 
 require 5.005_03;
 
@@ -34,7 +34,7 @@ BEGIN {
     @EXPORT_OK = (qw( date localdate gmdate now @ERROR_MESSAGES), 
         @{$EXPORT_TAGS{errors}});
 
-    $VERSION = '1.1.7';
+    $VERSION = '1.1.8';
     eval { Class::Date->bootstrap($VERSION); };
     if ($@) {
         warn "Cannot find the XS part of Class::Date, \n".
@@ -58,10 +58,12 @@ sub _set_tz { my ($tz) = @_;
     my $lasttz = $ENV{TZ};
     if (!defined $tz || $tz eq $NOTZ_TIMEZONE) {
         # warn "_set_tz: deleting TZ\n";
-        delete $ENV{TZ}
+        delete $ENV{TZ};
+        Env::C::unsetenv('TZ') if exists $INC{"Env/C.pm"};
     } else {
         # warn "_set_tz: setting TZ to $tz\n";
         $ENV{TZ} = $tz;
+        Env::C::setenv('TZ', $tz) if exists $INC{"Env/C.pm"};
     }
     tzset_xs();
     return $lasttz;
@@ -115,11 +117,18 @@ sub import {
   foreach my $symbol (@_) {
     if ($symbol eq '-DateParse') {
       if (!$Class::Date::DateParse++) {
-        if ( eval { require Date::Parse} ) {
+        if ( eval { require Date::Parse } ) {
             push @NEW_FROM_SCALAR,\&new_from_scalar_date_parse;
         } else {
-            warn "Date::Parse is not available but requested by Class::Date\n" 
+            warn "Date::Parse is not available, although it is requested by Class::Date\n" 
                 if $WARNINGS;
+        }
+      }
+    } elsif ($symbol eq '-EnvC') {
+      if (!$Class::Date::EnvC++) {
+        if ( !eval { require Env::C } ) {
+          warn "Env::C is not available, although it is requested by Class::Date\n"
+            if $WARNINGS;
         }
       }
     } else {
