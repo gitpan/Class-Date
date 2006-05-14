@@ -1,5 +1,5 @@
 package Class::Date;
-# $Id: Date.pm 59 2003-08-20 21:19:06Z dlux $
+# $Id: Date.pm 126 2005-11-21 21:16:16Z dlux $
 
 require 5.005_03;
 
@@ -34,7 +34,7 @@ BEGIN {
     @EXPORT_OK = (qw( date localdate gmdate now @ERROR_MESSAGES), 
         @{$EXPORT_TAGS{errors}});
 
-    $VERSION = '1.1.8';
+    $VERSION = '1.1.9';
     eval { Class::Date->bootstrap($VERSION); };
     if ($@) {
         warn "Cannot find the XS part of Class::Date, \n".
@@ -388,7 +388,17 @@ sub _set_invalid { my ($s,$error,$errmsg) = @_;
     return $s;
 }
 
-sub hms      { sprintf('%02d:%02d:%02d', @{ shift() }[c_hour,c_min,c_sec]) }
+sub ampm { my ($s) = @_;
+    return $s->[c_hour] < 12 ? "AM" : "PM"; 
+}
+
+sub meridiam { my ($s) = @_;
+    my $hour = $s->[c_hour] % 12;
+    if( $hour == 0 ) { $hour = 12; }
+    sprintf('%02d:%02d %s', $hour, $s->[c_min], $s->ampm);
+}
+
+sub hms { sprintf('%02d:%02d:%02d', @{ shift() }[c_hour,c_min,c_sec]) }
 
 sub ymd { my ($s)=@_;
   sprintf('%04d/%02d/%02d', $s->year, $s->mon, $s->[c_day])

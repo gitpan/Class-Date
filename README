@@ -71,6 +71,8 @@ SYNOPSIS
       $date->ymd          # 2000/02/29
       $date->mdy          # 02/29/2000
       $date->dmy          # 29/02/2000
+      $date->meridiam     # 01:23 AM
+      $date->ampm         # AM/PM
       $date->string       # 2000-02-29 12:21:11 (format can be changed, look below)
       "$date"             # same as prev.
       $date->tzoffset     # timezone-offset
