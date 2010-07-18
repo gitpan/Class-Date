@@ -3,7 +3,7 @@
  * Some functions (mini_mktime, strftime_xs) are borrowed from 
  * Matt Sergeant's Time::Object module
  *
- * $Id: Date.xs 58 2003-08-16 12:41:29Z dlux $
+ * $Id: Date.xs,v b7a562a12fb9 2003/08/16 12:41:29 dlux $
  *
  */
 

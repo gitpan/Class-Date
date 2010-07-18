@@ -1,5 +1,5 @@
 package Class::Date;
-# $Id: Date.pm 126 2005-11-21 21:16:16Z dlux $
+# $Id: Date.pm,v 8dbcc6b6035d 2008/11/23 00:41:11 dlux $
 
 require 5.005_03;
 
@@ -12,7 +12,6 @@ use vars qw(
   $NOTZ_TIMEZONE $RESTORE_TZ
 );
 use Carp;
-use UNIVERSAL qw(isa);
 
 use Exporter;
 use DynaLoader;
@@ -34,7 +33,7 @@ BEGIN {
     @EXPORT_OK = (qw( date localdate gmdate now @ERROR_MESSAGES), 
         @{$EXPORT_TAGS{errors}});
 
-    $VERSION = '1.1.9';
+    $VERSION = '1.1.10';
     eval { Class::Date->bootstrap($VERSION); };
     if ($@) {
         warn "Cannot find the XS part of Class::Date, \n".
@@ -44,6 +43,15 @@ BEGIN {
         *strftime_xs = *POSIX::strftime;
         *tzset_xs = *POSIX::tzset;
         *tzname_xs = *POSIX::tzname;
+    }
+
+    # For older perls (version below 5.007003, where Scalar::Util not included
+    # in standard distribution) we use our own version of blessed
+    if ( eval { require Scalar::Util; 1 } ) {
+        *my_blessed = *Scalar::Util::blessed;
+    }
+    else {
+        *my_blessed = sub { eval { ref($_[0]) && $_[0]->can("isa"); } };
     }
 }
 
@@ -144,15 +152,15 @@ sub new { my ($proto,$time,$tz)=@_;
   # if the prototype is an object, not a class, then the timezone will be
   # the same
   $tz = $proto->[c_tz] 
-    if defined($time) && !defined $tz && isa(ref($proto), __PACKAGE__ );
+    if defined($time) && !defined $tz && my_blessed($proto) && $proto->isa( __PACKAGE__ );
 
   # Default timezone is used if the timezone cannot be determined otherwise
   $tz = $DEFAULT_TIMEZONE if !defined $tz;
 
   return $proto->new_invalid(E_UNDEFINED,"") if !defined $time;
-  if (isa($time, __PACKAGE__ )) {
+  if (my_blessed($time) && $time->isa( __PACKAGE__ ) ) {
     return $class->new_copy($time,$tz);
-  } elsif (isa($time,'Class::Date::Rel')) {
+  } elsif (my_blessed($time) && $time->isa('Class::Date::Rel')) {
     return $class->new_from_scalar($time,$tz);
   } elsif (ref($time) eq 'ARRAY') {
     return $class->new_from_array($time,$tz);
@@ -228,7 +236,7 @@ sub new_from_scalar_internal { my ($s,$time,$tz) = @_;
     $obj->_recalc_from_epoch;
     return $obj;
   } elsif ($time =~ m{ ^\s* ( \d{0,4} ) - ( \d\d? ) - ( \d\d? ) 
-     ( \s+ ( \d\d? ) : ( \d\d? ) ( : ( \d\d?  ) (\.\d+)?)? )? }x) {
+     ( (?: T|\s+ ) ( \d\d? ) : ( \d\d? ) ( : ( \d\d?  ) (\.\d+)?)? )? }x) {
     my ($y,$m,$d,$hh,$mm,$ss)=($1,$2,$3,$5,$6,$8);
     # ISO(-like) date
     return $s->new_from_array([$y,$m,$d,$hh,$mm,$ss],$tz);
@@ -502,11 +510,11 @@ sub string { my ($s) = @_;
 }
 
 sub subtract { my ($s,$rhs)=@_;
-  if (isa(ref($rhs), __PACKAGE__ )) {
+  if (my_blessed($rhs) && $rhs->isa( __PACKAGE__ )) {
     my $dst_adjust = 0;
     $dst_adjust = 60*60*( $s->[c_isdst]-$rhs->[c_isdst] ) if $DST_ADJUST;
     return $s->ClassDateRel->new($s->[c_epoch]-$rhs->[c_epoch]+$dst_adjust);
-  } elsif (isa(ref($rhs), "Class::Date::Rel")) {
+  } elsif (my_blessed($rhs) && $rhs->isa("Class::Date::Rel")) {
     return $s->add(-$rhs);
   } elsif ($rhs) {
     return $s->add($s->ClassDateRel->new($rhs)->neg);
@@ -517,9 +525,9 @@ sub subtract { my ($s,$rhs)=@_;
 
 sub add { my ($s,$rhs)=@_;
   local $RANGE_CHECK;
-  $rhs=$s->ClassDateRel->new($rhs) if !isa($rhs,'Class::Date::Rel');
+  $rhs=$s->ClassDateRel->new($rhs) unless my_blessed($rhs) && $rhs->isa('Class::Date::Rel');
 	
-  return $s if !isa($rhs,'Class::Date::Rel');
+  return $s unless my_blessed($rhs) && $rhs->isa('Class::Date::Rel');
 
   # adding seconds
   my $retval= $rhs->[cs_sec] ? 
@@ -562,7 +570,7 @@ sub trunc { my ($s)=@_;
 
 sub get_epochs {
   my ($lhs,$rhs,$reverse)=@_;
-  if (!isa(ref($rhs), __PACKAGE__ )) {
+  unless (my_blessed($rhs) && $rhs->isa( __PACKAGE__ )) {
     $rhs = $lhs->new($rhs);
   }
   my $repoch= $rhs ? $rhs->epoch : 0;
@@ -586,7 +594,6 @@ sub to_tz { my ($s, $tz) = @_;
 package Class::Date::Rel;
 use strict;
 use vars qw(@NEW_FROM_SCALAR);
-use UNIVERSAL qw(isa);
 use Class::Date::Const;
 
 use constant SEC_PER_MONTH => 2_629_744;
@@ -606,7 +613,7 @@ use overload
 sub new { my ($proto,$val)=@_;
   my $class = ref($proto) || $proto;
   return undef if !defined $val;
-  if (isa(ref($val), __PACKAGE__ )) {
+  if (Class::Date::my_blessed($val) && $val->isa( __PACKAGE__ )) {
     return $class->new_copy($val);
   } elsif (ref($val) eq 'ARRAY') {
     return $class->new_from_array($val);
@@ -678,7 +685,7 @@ push @NEW_FROM_SCALAR,\&new_from_scalar_internal;
 
 sub compare { my ($s,$val2,$reverse) = @_;
   my $rev_multiply=$reverse ? -1 : 1;
-  if (isa($val2, __PACKAGE__ )) {
+  if (Class::Date::my_blessed($val2) && $val2->isa( __PACKAGE__ )) {
     return ($s->sec <=> $val2->sec) * $rev_multiply;
   } else {
     my $date_obj=$s->new($val2);

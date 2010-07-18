@@ -1,5 +1,11 @@
 Revision history for Perl extension Class::Date.
 
+1.1.10  Sun Jul 18 13:27:39 CEST 2010
+	- Remove the deprecated UNIVERSAL::import (Vladimir Timofeev)
+
+1.1.9   Sun May 14 22:52:50 CEST 2006
+	- Added "meridiam" and "ampm" methods by llarian
+
 1.1.8	Sun Nov  6 16:36:54 CET 2005
 	- Added Env::C support for mod_perl environments
 	- Added documentation about thread-safety and mod_perl issues
