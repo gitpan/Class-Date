@@ -3,13 +3,17 @@ Date.pm
 Date.pod
 Date.xs
 Date/Const.pm
-MANIFEST
-MANIFEST.SKIP
-Makefile.PL
+MANIFEST			This list of files
+META.yml
+MYMETA.json
+MYMETA.yml
 README
+success.txt
 t/00_base.t
+t/05_parsing.t
 t/10_fields.t
 t/20_gmdate.t
 t/30_localdate.t
 t/40_errors.t
-META.yml                                 Module meta-data (added by MakeMaker)
+t/50_timezone.t
+META.json                                Module JSON meta-data (added by MakeMaker)

@@ -1,5 +1,11 @@
 Revision history for Perl extension Class::Date.
 
+1.1.11 Wed Apr 30 06:56:24 2014
+    - Convert the pod to UTF8 and add =encoding RT #94657 
+    - Minumum version of perl is not 5.006
+    - Makefile updated
+    - New maintainer: Gabor Szabo
+
 1.1.10  Sun Jul 18 13:27:39 CEST 2010
 	- Remove the deprecated UNIVERSAL::import (Vladimir Timofeev)
 

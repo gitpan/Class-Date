@@ -461,22 +461,36 @@ USAGE
     You can get the error in string form by calling the "errstr" method.
 
 DST_ADJUST
-    $DST_ADJUST is an importable variable, and is a very important
-    configuration option.
+    $DST_ADJUST is an important configuration option.
 
-    If it is set to true (default), then it adjusts the date and time when
-    the operation switches the border of DST. You will see the difference if
-    you run this code:
+    If it is set to true (default), then the module adjusts the date and
+    time when the operation switches the border of DST. With this setting,
+    you are ignoring the effect of DST.
 
-      $Class::Date::DST_ADJUST=0;
-      for (my $date=localdate("2000-06-11");$date<"2001-4-5";$date+='1D') {
-        print $date."\n";
-      }
+    When $DST_ADJUST is set to false, then no adjustment is done, the
+    calculation will be based on the exact time difference.
+
+    You will see the difference through an example:
 
       $Class::Date::DST_ADJUST=1;
-      for (my $date=localdate("2000-06-11");$date<"2001-4-5";$date+='1D') {
-        print $date."\n";
-      }
+
+      print date("2000-10-29", "CET") + "1D";
+      # This will print 2000-10-30 00:00:00
+
+      print date("2001-03-24 23:00:00", "CET") + "1D";
+      # This will be 2001-03-25 23:00:00
+
+      print date("2001-03-25", "CET") + "1D";
+      # This will be 2001-03-26 00:00:00
+
+
+      $Class::Date::DST_ADJUST=0;
+
+      print date("2000-10-29", "CET") + "1D";
+      # This will print 2000-10-29 23:00:00
+
+      print date("2001-03-24 23:00:00", "CET") + "1D";
+      # This will be 2001-03-26 00:00:00
 
 MONTHS AND YEARS
     If you add or subtract "months" and "years" to a date, you may get wrong
@@ -502,7 +516,7 @@ MONTH_BORDER_ADJUST
     When $MONTH_BORDER_ADJUST is true, this result becomes "2001-02-28". So
     when the date overflows, then it returns the last day insted.
 
-    Both settings keeps the time information.
+    Both settings keep the time information.
 
 WORKING WITHOUT A C COMPILER
     Class::Date can be used without a C compiler since 1.0.8. If you want to
@@ -637,6 +651,19 @@ THREAD SAFETY and MOD_PERL
     it in a multi-threaded environment!
 
 OTHER BUGS AND LIMITATIONS
+    *   Not all date/time values can be expressed in all timezones. For
+        example:
+
+          print date("2010-10-03 02:00:00", "Australia/Sydney")
+          # it will print 2010-10-03 03:00:00
+
+        No matter how hard you try you, you are not going to be able to
+        express the time in the example in that timezone. If you don't need
+        the timezone information and you want to make sure that the
+        calculations are always correct, please use GMT as a timezone (the
+        'gmdate' function can be a shortcut for it). In this case, you might
+        also consider turning off DST_ADJUST to speed up the calculation.
+
     *   I cannot manage to get the timezone code working properly on
         ActivePerl 5.8.0 on win XP and earlier versions possibly have this
         problem also. If you have a system like this, then you will have
@@ -713,7 +740,7 @@ WIN32 notes
     time you just run the 'install'.
 
 COPYRIGHT
-    Copyright (c) 2001 SzabÛ, Bal·zs (dLux)
+    Copyright (c) 2001 Szab√≥, Bal√°zs (dLux)
 
     All rights reserved. This program is free software; you can redistribute
     it and/or modify it under the same terms as Perl itself.
@@ -721,7 +748,10 @@ COPYRIGHT
     Portions Copyright (c) Matt Sergeant
 
 AUTHOR
-      dLux (SzabÛ, Bal·zs) <dlux@dlux.hu>
+      dLux (Szab√≥, Bal√°zs) <dlux@dlux.hu>
+
+MAINTAINER
+       L<Gabor Szabo|http://szabgab.com/>
 
 CREDITS
       - Matt Sergeant <matt@sergeant.org>
