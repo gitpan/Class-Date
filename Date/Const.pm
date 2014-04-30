@@ -4,7 +4,7 @@ use strict;
 use vars qw(@EXPORT @ISA @ERROR_MESSAGES %EXPORT_TAGS $VERSION);
 use Exporter;
 
-$VERSION = '1.1.11';
+$VERSION = '1.1.12';
 
 my %FIELDS = (
     # Class::Date fields

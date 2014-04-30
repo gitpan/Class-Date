@@ -1,5 +1,8 @@
 Revision history for Perl extension Class::Date.
 
+1.1.12 Wed Apr 30 08:44:29 2014
+    - Fixing MANIFEST.SKIP to include Makefile.PL and exclue MYMETA files.
+
 1.1.11 Wed Apr 30 06:56:24 2014
     - Convert the pod to UTF8 and add =encoding RT #94657 
     - Minumum version of perl is not 5.006
