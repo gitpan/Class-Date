@@ -1,5 +1,8 @@
 Revision history for Perl extension Class::Date.
 
+1.1.13 Fri May  2 08:32:15 2014
+    - Use Test::More for testing
+
 1.1.12 Wed Apr 30 08:44:29 2014
     - Fixing MANIFEST.SKIP to include Makefile.PL and exclue MYMETA files.
 

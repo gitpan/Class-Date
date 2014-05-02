@@ -9,7 +9,7 @@ Class::Date - Class for easy date and time manipulation
   use Class::Date qw(:errors date localdate gmdate now -DateParse -EnvC);
   
   # creating absolute date object (local time)
-  $date = new Class::Date [$year,$month,$day,$hour,$min,$sec];
+  $date = Class::Date->new( [$year,$month,$day,$hour,$min,$sec]);
   $date = date [$year,$month,$day,$hour,$min,$sec]; 
     # ^- "date" is an exportable function, the same as Class::Date->new
   $date = date { year => $year, month => $month, day => $day,
@@ -21,26 +21,26 @@ Class::Date - Class for easy date and time manipulation
   ...
 
   # creating absolute date object (GMT)
-  $date = new Class::Date [$year,$month,$day,$hour,$min,$sec],'GMT';
+  $date = Class::Date->new( [$year,$month,$day,$hour,$min,$sec],'GMT');
   $date = gmdate "2001-11-12 17:13";
   ...
 
   # creating absolute date object in any other timezone
-  $date = new Class::Date [$year,$month,$day,$hour,$min,$sec],'Iceland';
+  $date = Class::Date->new( [$year,$month,$day,$hour,$min,$sec],'Iceland' );
   $date = date "2001-11-12 17:13", 'Iceland';
   $date2 = $date->new([$y2, $m2, $d2, $h2, $m2, $s2]); 
     # ^- timezone is inherited from the $date object
 
   # creating relative date object
   # (normally you don't need to create this object explicitly)
-  $reldate = new Class::Date::Rel "3Y 1M 3D 6h 2m 4s";
-  $reldate = new Class::Date::Rel "6Y";
-  $reldate = new Class::Date::Rel $secs;  # secs
-  $reldate = new Class::Date::Rel [$year,$month,$day,$hour,$min,$sec];
-  $reldate = new Class::Date::Rel { year => $year, month => $month, day => $day,
-    hour => $hour, min => $min, sec => $sec };
-  $reldate = new Class::Date::Rel "2001-11-12 07:13:12";
-  $reldate = new Class::Date::Rel "2001-12-11";
+  $reldate = Class::Date::Rel->new( "3Y 1M 3D 6h 2m 4s" );
+  $reldate = Class::Date::Rel->new( "6Y" );
+  $reldate = Class::Date::Rel->new( $secs );  # secs
+  $reldate = Class::Date::Rel->new( [$year,$month,$day,$hour,$min,$sec] );
+  $reldate = Class::Date::Rel->new( { year => $year, month => $month, day => $day,
+    hour => $hour, min => $min, sec => $sec } );
+  $reldate = Class::Date::Rel->new( "2001-11-12 07:13:12" );
+  $reldate = Class::Date::Rel->new( "2001-12-11" );
 
   # getting values of an absolute date object
   $date;              # prints the date in default output format (see below)
@@ -490,7 +490,7 @@ This error is set, when the constructor cannot be created from a scalar, e.g:
 This error is set, when you want to create a date object from an undefined
 value:
 
-  $a = new Class::Date (undef);
+  $a = Class::Date->new(undef);
 
 Note, that localdate(undef) will create a valid object, because it calls
 $Class::Date(time).
@@ -809,7 +809,7 @@ Portions Copyright (c) Matt Sergeant
 
 =head1 MAINTAINER
 
-   L<Gabor Szabo|http://szabgab.com/>
+   L<http://szabgab.com/>
 
 =head1 CREDITS
 

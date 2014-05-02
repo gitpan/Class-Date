@@ -1,21 +1,20 @@
-print "1..6\n";
+use strict;
+use warnings;
+use Test::More;
+
+plan tests => 6;
 
 use Class::Date qw(now gmdate);
-print "ok 1\n";
+ok(1);
 
 my $t = gmdate(315532800); # 00:00:00 1/1/1980
 
-print "not " if ($t->year != 1980);
-print "ok 2\n";
+is $t->year, 1980, 'year';
 
-print "not " if ($t->hour);
-print "ok 3\n";
+is $t->hour, 0, 'hour';
 
-print "not " if ($t->mon != 1);
-print "ok 4\n";
+is $t->mon, 1, 'mon';
 
-print "not " unless now>"1970-1-1";
-print "ok 5\n";
+cmp_ok now, '>', "1970-1-1";
 
-print "not " unless gmdate("now")>"1970-1-1";
-print "ok 6\n";
+cmp_ok gmdate("now"), '>', "1970-1-1";
