@@ -4,13 +4,15 @@ use ExtUtils::MakeMaker;
 use 5.006;
 WriteMakefile(
     NAME          => 'Class::Date',
-    VERSION_FROM  => 'Date.pm',
-    ABSTRACT_FROM => 'Date.pod',
+    VERSION_FROM  => 'lib/Class/Date.pm',
+    ABSTRACT_FROM => 'lib/Class/Date.pod',
     AUTHOR        => 'Balazs Szabo (dLux)',
     LICENSE       => 'perl',
     MIN_PERL_VERSION => 5.006,
     BUILD_REQUIRES => {
            'Test::More'     => '1.001',
+           'Env::C'         => '0.10', # still conditional in the code, but let's try to require it.
+           'Scalar::Util'   => '1.38',
     },
     META_MERGE        => {
        resources => {
@@ -26,7 +28,7 @@ WriteMakefile(
            'Gabor Szabo <szabgab@cpan.org>',
        ],
     },
-    dist              => { 
-        PREOP => $^X.' -MPod::Text -e "pod2text(q(Date.pod))" > README'
-    }
+#    dist              => { 
+#        PREOP => $^X.' -MPod::Text -e "pod2text(q(Date.pod))" > README'
+#    }
 )

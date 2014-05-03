@@ -3,6 +3,8 @@ abstract: 'Class for easy date and time manipulation'
 author:
   - 'Balazs Szabo (dLux)'
 build_requires:
+  Env::C: 0.10
+  Scalar::Util: 1.38
   Test::More: 1.001
 configure_requires:
   ExtUtils::MakeMaker: 0
@@ -21,7 +23,7 @@ requires:
   perl: 5.006
 resources:
   repository: http://code.google.com/p/perl-class-date/
-version: v1.1.13
+version: v1.1.14
 x_contributors:
   - 'dLux (Szabó, Balázs) <dlux@dlux.hu>'
   - 'Matt Sergeant <matt@sergeant.org>'
