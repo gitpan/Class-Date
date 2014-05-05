@@ -1,10 +1,10 @@
 package Class::Date::Const;
 use strict;
 
-use vars qw(@EXPORT @ISA @ERROR_MESSAGES %EXPORT_TAGS $VERSION);
+use vars qw(@EXPORT @ISA @ERROR_MESSAGES %EXPORT_TAGS);
 use Exporter;
 
-$VERSION = '1.1.14';
+our $VERSION = '1.1.15';
 
 my %FIELDS = (
     # Class::Date fields

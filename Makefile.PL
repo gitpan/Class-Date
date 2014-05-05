@@ -11,7 +11,7 @@ WriteMakefile(
     MIN_PERL_VERSION => 5.006,
     BUILD_REQUIRES => {
            'Test::More'     => '1.001',
-           'Env::C'         => '0.10', # still conditional in the code, but let's try to require it.
+           #'Env::C'         => '0.06', # still conditional in the code, but let's try to require it. See also: RT #95332
            'Scalar::Util'   => '1.38',
     },
     META_MERGE        => {

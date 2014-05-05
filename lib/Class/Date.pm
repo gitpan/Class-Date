@@ -5,7 +5,7 @@ use 5.006;
 
 use strict;
 use vars qw(
-  $VERSION @EXPORT_OK %EXPORT_TAGS @ISA
+  @EXPORT_OK %EXPORT_TAGS @ISA
   $DATE_FORMAT $DST_ADJUST $MONTH_BORDER_ADJUST $RANGE_CHECK
   @NEW_FROM_SCALAR @ERROR_MESSAGES $WARNINGS 
   $DEFAULT_TIMEZONE $LOCAL_TIMEZONE $GMT_TIMEZONE
@@ -37,7 +37,7 @@ BEGIN {
     @EXPORT_OK = (qw( date localdate gmdate now @ERROR_MESSAGES), 
         @{$EXPORT_TAGS{errors}});
 
-    $VERSION = '1.1.14';
+    our $VERSION = '1.1.15';
     eval { Class::Date->bootstrap($VERSION); };
     if ($@) {
         warn "Cannot find the XS part of Class::Date, \n".

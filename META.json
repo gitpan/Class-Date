@@ -22,7 +22,6 @@
    "prereqs" : {
       "build" : {
          "requires" : {
-            "Env::C" : "0.10",
             "Scalar::Util" : "1.38",
             "Test::More" : "1.001"
          }
@@ -44,7 +43,7 @@
          "url" : "http://code.google.com/p/perl-class-date/"
       }
    },
-   "version" : "v1.1.14",
+   "version" : "v1.1.15",
    "x_contributors" : [
       "dLux (Szabó, Balázs) <dlux@dlux.hu>",
       "Matt Sergeant <matt@sergeant.org>",

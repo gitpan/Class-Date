@@ -1,7 +1,9 @@
 Revision history for Perl extension Class::Date.
 
-1.1.14 Sat May  3 11:02:33 2014
+1.1.15 Mon May  5 06:18:37 2014
+    - Don't require Env::C  due to RT #95332
 
+1.1.14 Sat May  3 11:02:33 2014
     - Move Date/Const.pm to lib/Calss/Date/
     - Move Class::Date::Invalid and Class::Date::Rel to their own files in lib/Class/Date/
     - Require Scalar::Util and remove work-around lack of Scalar::Util

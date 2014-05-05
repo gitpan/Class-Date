@@ -4,7 +4,7 @@ use warnings;
 
 use Class::Date::Const;
 
-our $VERSION = '1.1.14';
+our $VERSION = '1.1.15';
 
 use overload 
   '0+'     => "zero",
